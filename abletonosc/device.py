@@ -31,7 +31,13 @@ class DeviceHandler(AbletonOSCHandler):
 
     def _start_mixer_listen(self, target, prop, params: Optional[Tuple] = ()) -> None:
         if prop == 'sends':
-            track_id, send_id, = params
+            track_id = -1 
+            send_id = -1
+            if len(params) == 2:
+                track_id, send_id, = params
+            if len(params) == 6:
+                track_id, send_id, = params[4:]
+            self.logger.info("well gee, i think the send id is: %d" % send_id)
             parameter_object = getattr(target.mixer_device, prop)[send_id]
         else:
             parameter_object = getattr(target.mixer_device, prop)
@@ -75,6 +81,9 @@ class DeviceHandler(AbletonOSCHandler):
             def device_callback(params: Tuple[Any]):
                 track_index, device_index = int(params[0]), int(params[1])
                 device = self.song.tracks[track_index].devices[device_index]
+                rack_device = device if isinstance(device, Live.RackDevice.RackDevice) else None
+                if rack_device is not None:
+                    device = rack_device
                 if (include_ids):
                     rv = func(device, *args, params[0:])
                 else:
@@ -102,6 +111,28 @@ class DeviceHandler(AbletonOSCHandler):
                     if rv is not None:
                         return (track_index, device_index, chain_index, *rv)
             return chain_callback
+        
+        def create_chain_device_callback(func: Callable,
+                                  *args,
+                                  include_chain_id: bool = False):
+            def chain_device_callback(params: Tuple[Any]):
+                track_index, device_index, chain_index, sub_device_index, chain_subdevice_chain_index, send_index = int(params[0]), int(params[1]), int(params[2]), int(params[3]), int(params[4]), int(params[5])
+                device = self.song.tracks[track_index].devices[device_index]
+                rack_device = device if isinstance(device, Live.RackDevice.RackDevice) else None
+                if rack_device is not None and len(rack_device.chains):
+                    chain = rack_device.chains[chain_index]
+                    chain_sub_device = chain.devices[sub_device_index] if isinstance(chain.devices[sub_device_index], Live.RackDevice.RackDevice) else None
+                    if chain_sub_device is not None:
+                        chain_sub_device_chain = chain_sub_device.chains[chain_subdevice_chain_index]
+                        self.logger.info("we have sub device named %s" % chain_sub_device_chain.name )
+                        if (include_chain_id):
+                            rv = func(chain_sub_device_chain, *args, params)
+                        else:
+                            rv = func(chain_sub_device_chain, *args, params[6:])
+
+                        if rv is not None:
+                            return (track_index, device_index, chain_index, sub_device_index, send_index, *rv)
+            return chain_device_callback
 
         methods = [
         ]
@@ -153,6 +184,10 @@ class DeviceHandler(AbletonOSCHandler):
             for index, value in enumerate(params):
                 device.parameters[index].value = value
 
+
+        def rack_get_chains_name(device, params: Tuple[Any] = ()):
+            return tuple(chain.name for chain in device.chains)
+        
         self.osc_server.add_handler("/live/device/get/num_parameters", create_device_callback(device_get_num_parameters))
         self.osc_server.add_handler("/live/device/get/parameters/name", create_device_callback(device_get_parameters_name))
         self.osc_server.add_handler("/live/device/get/parameters/value", create_device_callback(device_get_parameters_value))
@@ -160,7 +195,7 @@ class DeviceHandler(AbletonOSCHandler):
         self.osc_server.add_handler("/live/device/get/parameters/max", create_device_callback(device_get_parameters_max))
         self.osc_server.add_handler("/live/device/get/parameters/is_quantized", create_device_callback(device_get_parameters_is_quantized))
         self.osc_server.add_handler("/live/device/set/parameters/value", create_device_callback(device_set_parameters_value))
-
+        self.osc_server.add_handler("/live/rack/get/chains/name", create_device_callback(rack_get_chains_name))
         #--------------------------------------------------------------------------------
         # Device: Get/set individual parameters
         #--------------------------------------------------------------------------------
@@ -235,7 +270,7 @@ class DeviceHandler(AbletonOSCHandler):
         # Volume, panning and send are properties of the chains's mixer_device so
         # can't be formulated as normal callbacks that reference properties of chain.
         #--------------------------------------------------------------------------------
-        mixer_properties_rw = ["volume", "panning", "sends"]
+        mixer_properties_rw = ["volume", "panning"]
         for prop in mixer_properties_rw:
             self.osc_server.add_handler("/live/chain/get/%s" % prop,
                                         create_chain_callback(self._get_mixer_property, prop))
@@ -246,12 +281,21 @@ class DeviceHandler(AbletonOSCHandler):
             self.osc_server.add_handler("/live/chain/stop_listen/%s" % prop,
                                         create_chain_callback(self._stop_mixer_listen, prop, include_chain_id=True))
             
+        mixer_sends_properties_rw = "sends"
+        self.osc_server.add_handler("/live/chain/get/%s" % mixer_sends_properties_rw,
+                                    create_chain_device_callback(self._get_mixer_property, mixer_sends_properties_rw))
+        self.osc_server.add_handler("/live/chain/set/%s" % mixer_sends_properties_rw,
+                                    create_chain_device_callback(self._set_mixer_property, mixer_sends_properties_rw))
+        self.osc_server.add_handler("/live/chain/start_listen/%s" % mixer_sends_properties_rw,
+                                    create_chain_device_callback(self._start_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
+        self.osc_server.add_handler("/live/chain/stop_listen/%s" % mixer_sends_properties_rw,
+                                    create_chain_device_callback(self._stop_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
+
+        
+            
         #--------------------------------------------------------------------------------
         # Chain: Get/set parameter lists
         #--------------------------------------------------------------------------------
-
-        def rack_get_chains_name(device, params: Tuple[Any] = ()):
-            return tuple(chain.name for chain in device.chains)
 
         # def device_get_num_parameters(device, params: Tuple[Any] = ()):
         #     return len(device.parameters),
@@ -275,7 +319,6 @@ class DeviceHandler(AbletonOSCHandler):
         #     for index, value in enumerate(params):
         #         device.parameters[index].value = value
 
-        self.osc_server.add_handler("/live/rack/get/chains/name", create_chain_callback(rack_get_chains_name))
         # self.osc_server.add_handler("/live/device/get/parameters/name", create_device_callback(device_get_parameters_name))
         # self.osc_server.add_handler("/live/device/get/parameters/value", create_device_callback(device_get_parameters_value))
         # self.osc_server.add_handler("/live/device/get/parameters/min", create_device_callback(device_get_parameters_min))
