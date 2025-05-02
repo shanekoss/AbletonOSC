@@ -37,7 +37,6 @@ class DeviceHandler(AbletonOSCHandler):
                 track_id, send_id, = params
             if len(params) == 6:
                 track_id, send_id, = params[4:]
-            self.logger.info("well gee, i think the send id is: %d" % send_id)
             parameter_object = getattr(target.mixer_device, prop)[send_id]
         else:
             parameter_object = getattr(target.mixer_device, prop)
