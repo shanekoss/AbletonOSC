@@ -111,7 +111,7 @@ class DeviceHandler(AbletonOSCHandler):
                         return (track_index, device_index, chain_index, *rv)
             return chain_callback
         
-        def create_chain_device_callback(func: Callable,
+        def create_chain_device_send_callback(func: Callable,
                                   *args,
                                   include_chain_id: bool = False):
             def chain_device_callback(params: Tuple[Any]):
@@ -282,15 +282,24 @@ class DeviceHandler(AbletonOSCHandler):
             
         mixer_sends_properties_rw = "sends"
         self.osc_server.add_handler("/live/chain/get/%s" % mixer_sends_properties_rw,
-                                    create_chain_device_callback(self._get_mixer_property, mixer_sends_properties_rw))
+                                    create_chain_device_send_callback(self._get_mixer_property, mixer_sends_properties_rw))
         self.osc_server.add_handler("/live/chain/set/%s" % mixer_sends_properties_rw,
-                                    create_chain_device_callback(self._set_mixer_property, mixer_sends_properties_rw))
+                                    create_chain_device_send_callback(self._set_mixer_property, mixer_sends_properties_rw))
         self.osc_server.add_handler("/live/chain/start_listen/%s" % mixer_sends_properties_rw,
-                                    create_chain_device_callback(self._start_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
+                                    create_chain_device_send_callback(self._start_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
         self.osc_server.add_handler("/live/chain/stop_listen/%s" % mixer_sends_properties_rw,
-                                    create_chain_device_callback(self._stop_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
+                                    create_chain_device_send_callback(self._stop_mixer_listen, mixer_sends_properties_rw, include_chain_id=True))
 
-        
+        chain_device_properties = ["mute"]
+        for prop in chain_device_properties:
+            self.osc_server.add_handler("/live/chain/get/%s" % prop,
+                                        create_chain_callback(self._get_property, prop))
+            self.osc_server.add_handler("/live/chain/set/%s" % prop,
+                                        create_chain_callback(self._set_property, prop))
+            self.osc_server.add_handler("/live/chain/start_listen/%s" % prop,
+                                        create_chain_callback(self._start_listen, prop, include_chain_id=True))
+            self.osc_server.add_handler("/live/chain/stop_listen/%s" % prop,
+                                        create_chain_callback(self._stop_listen, prop, include_chain_id=True))
             
         #--------------------------------------------------------------------------------
         # Chain: Get/set parameter lists
