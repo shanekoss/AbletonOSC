@@ -6,6 +6,7 @@ import importlib
 import traceback
 import logging
 import os
+import Live
 
 logger = logging.getLogger("abletonosc")
 
@@ -16,20 +17,25 @@ class Manager(ControlSurface):
         self.log_level = "info"
 
         self.handlers = []
-
         try:
             self.osc_server = abletonosc.OSCServer()
+            self.midi_handler = abletonosc.MidiHandler(c_instance)
             self.schedule_message(0, self.tick)
 
             self.start_logging()
             self.init_api()
 
-            self.show_message("AbletonOSC: Listening for OSC on port %d" % abletonosc.OSC_LISTEN_PORT)
+            logger.info("AbletonOSC: Listening for OSC on port %d" % abletonosc.OSC_LISTEN_PORT)
             logger.info("Started AbletonOSC on address %s" % str(self.osc_server._local_addr))
         except OSError as msg:
-            self.show_message("AbletonOSC: Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
+            logger.info("AbletonOSC: Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
             logger.info("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
 
+    def build_midi_map(self, midi_map_handle):
+        self.midi_handler.build_midi_map(midi_map_handle)
+    
+    def receive_midi(self, midi_bytes):
+        self.midi_handler.receive_midi(midi_bytes)
 
     def start_logging(self):
         """
@@ -66,7 +72,7 @@ class Manager(ControlSurface):
 
     def init_api(self):
         def test_callback(params):
-            self.show_message("Received OSC OK")
+            logger.info("Received OSC OK")
             self.osc_server.send("/live/test", ("ok",))
         def reload_callback(params):
             self.reload_imports()
@@ -133,10 +139,9 @@ class Manager(ControlSurface):
         logger.info("Reloaded code")
 
     def disconnect(self):
-        self.show_message("Disconnecting...")
+        logger.info("Disconnecting...")
         logger.info("Disconnecting...")
         self.stop_logging()
         self.osc_server.shutdown()
         super().disconnect()
-
 

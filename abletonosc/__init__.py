@@ -4,6 +4,7 @@ logger = logging.getLogger("abletonosc")
 logger.info("Reloading abletonosc...")
 
 from .osc_server import OSCServer
+from .midi_handler import MidiHandler
 from .application import ApplicationHandler
 from .song import SongHandler
 from .clip import ClipHandler
