@@ -19,7 +19,7 @@ class Manager(ControlSurface):
         self.handlers = []
         try:
             self.osc_server = abletonosc.OSCServer()
-            self.midi_handler = abletonosc.MidiHandler(c_instance)
+            self.midi_router = abletonosc.MidiRouter(c_instance)
             self.schedule_message(0, self.tick)
 
             self.start_logging()
@@ -30,12 +30,6 @@ class Manager(ControlSurface):
         except OSError as msg:
             logger.info("AbletonOSC: Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
             logger.info("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
-
-    def build_midi_map(self, midi_map_handle):
-        self.midi_handler.build_midi_map(midi_map_handle)
-    
-    def receive_midi(self, midi_bytes):
-        self.midi_handler.receive_midi(midi_bytes)
 
     def start_logging(self):
         """
@@ -145,3 +139,10 @@ class Manager(ControlSurface):
         self.osc_server.shutdown()
         super().disconnect()
 
+    def build_midi_map(self, midi_map_handle):
+        self.midi_router.build_midi_map(midi_map_handle)
+        super(Manager, self).build_midi_map(midi_map_handle)  
+    
+    def receive_midi(self, midi_bytes):
+        self.midi_router.receive_midi(midi_bytes)
+          
