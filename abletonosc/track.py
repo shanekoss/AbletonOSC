@@ -10,7 +10,10 @@ class TrackHandler(AbletonOSCHandler):
     def init_api(self):
         def create_track_callback(func: Callable,
                                   *args,
-                                  include_track_id: bool = False):
+                                  include_track_id: bool = False,
+                                  getter = None,
+                                  midi_callback = False
+                                  ):
             def track_callback(params: Tuple[Any]):
                 if params[0] == "*":
                     track_indices = list(range(len(self.song.tracks)))
@@ -20,9 +23,9 @@ class TrackHandler(AbletonOSCHandler):
                 for track_index in track_indices:
                     track = self.song.tracks[track_index]
                     if include_track_id:
-                        rv = func(track, *args, tuple([track_index] + params[1:]))
+                        rv = func(track, *args, tuple([track_index] + params[1:]), getter, midi_callback)
                     else:
-                        rv = func(track, *args, tuple(params[1:]))
+                        rv = func(track, *args, tuple(params[1:]), getter, midi_callback)
 
                     if rv is not None:
                         return (track_index, *rv)
@@ -59,6 +62,29 @@ class TrackHandler(AbletonOSCHandler):
             "name"
         ]
 
+
+        def send_clip_name_for_fired_index(track, params: Tuple[Any] = ()):
+            # self.logger.info(track.name)
+            # self.logger.info(len(track.clip_slots))
+            # self.logger.info(track.fired_slot_index)
+            # self.logger.info(f"PARAMS: {params}")
+            if track.fired_slot_index != -1:
+                clip1 = self.song.tracks[params[1]].clip_slots[track.fired_slot_index].clip.name
+                clip2 = self.song.tracks[params[2]].clip_slots[track.fired_slot_index].clip.name
+                clip3 = self.song.tracks[params[3]].clip_slots[track.fired_slot_index].clip.name
+                
+                clips = [clip1, clip2, clip3]
+                for index, clip in enumerate(clips):
+                    clip_name_bytes = clip.encode('ascii', errors='ignore')
+
+                    # Construct the full SysEx message by combining:
+                    # - The fixed parts (26 and params[0] as integers)
+                    # - The encoded string bytes
+                    sysex_message = bytes([26, index]) + clip_name_bytes
+                    self.manager.send_sysex(sysex_message)
+
+        self.osc_server.add_handler("/live/track/start_listen_send_midi/fired_slot_index",
+                                        create_track_callback(self._start_listen, "fired_slot_index", include_track_id=True, getter=send_clip_name_for_fired_index, midi_callback=True))
         for method in methods:
             self.osc_server.add_handler("/live/track/%s" % method,
                                         create_track_callback(self._call_method, method))

@@ -89,11 +89,10 @@ class Manager(ControlSurface):
         logger.info("Handle incoming CC messages")
         channel = sender.message_channel() + 1  # Convert to 1-based channel
         cc_num = sender.message_identifier()
-        logger.info(
-            f"CC CH{channel:02d} #{cc_num:03d} = {value:03d}"
-        )
-        test_sysex = bytes([cc_num, value])
-        self.send_sysex(test_sysex)
+        self.processCCMessage(channel, cc_num, value)
+
+        # test_sysex = bytes([cc_num, value])
+        # self.send_sysex(test_sysex)
 
     def _handle_note(self, channel, note_number, is_on, velocity):
         """Process incoming Note messages"""
@@ -247,3 +246,12 @@ class Manager(ControlSurface):
         self.stop_logging()
         self.osc_server.shutdown()
         super().disconnect()
+
+    def processCCMessage(self, channel, cc_num, value):
+        handled = False
+        if channel == 1:
+            if cc_num == 16:
+                handled = True
+                self.song.tracks[0].clip_slots[value].fire()
+        if handled == False:
+            logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")

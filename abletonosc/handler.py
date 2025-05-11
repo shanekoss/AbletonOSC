@@ -44,7 +44,7 @@ class AbletonOSCHandler(Component):
         self.logger.info("Getting property for %s: %s = %s" % (self.class_identifier, prop, value))
         return (value, *params)
 
-    def _start_listen(self, target, prop, params: Optional[Tuple] = (), getter = None) -> None:
+    def _start_listen(self, target, prop, params: Optional[Tuple] = (), getter = None, midi_callback = None) -> None:
         """
         Start listening for the property named `prop` on the Live object `target`.
         `params` is typically a tuple containing the track/clip index.
@@ -62,12 +62,16 @@ class AbletonOSCHandler(Component):
             if getter is None:
                 value = getattr(target, prop)
             else:
-                value = getter(params)
+                if midi_callback is None:
+                    value = getter(params)
+                else:
+                    value = getter(target, params)
             if type(value) is not tuple:
                 value = (value,)
             self.logger.info("Property %s changed of %s %s: %s" % (prop, self.class_identifier, str(params), value))
-            osc_address = "/live/%s/get/%s" % (self.class_identifier, prop)
-            self.osc_server.send(osc_address, (*params, *value,))
+            if midi_callback == False:
+                osc_address = "/live/%s/get/%s" % (self.class_identifier, prop)
+                self.osc_server.send(osc_address, (*params, *value,))
 
         listener_key = (prop, tuple(params))
         if listener_key in self.listener_functions:
