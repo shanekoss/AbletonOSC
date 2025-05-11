@@ -1,7 +1,8 @@
 from ableton.v2.control_surface import ControlSurface
+from ableton.v2.control_surface.elements import SliderElement, ButtonElement, EncoderElement
+from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYPE
 
 from . import abletonosc
-
 import importlib
 import traceback
 import logging
@@ -13,24 +14,138 @@ logger = logging.getLogger("abletonosc")
 class Manager(ControlSurface):
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
-
+        self._c_instance = c_instance
         self.log_level = "info"
 
-        self.handlers = []
+        # MIDI Handling Setup
+        self._cc_listeners = []
+        self._note_listeners = []
+        self._sysex_listeners = []
+
         try:
             self.osc_server = abletonosc.OSCServer()
-            self.midi_router = abletonosc.MidiRouter(c_instance)
             self.schedule_message(0, self.tick)
-
             self.start_logging()
             self.init_api()
+            self._setup_midi_handling()
 
             logger.info("AbletonOSC: Listening for OSC on port %d" % abletonosc.OSC_LISTEN_PORT)
-            logger.info("Started AbletonOSC on address %s" % str(self.osc_server._local_addr))
         except OSError as msg:
-            logger.info("AbletonOSC: Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
-            logger.info("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
+            logger.error("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
 
+    def handle_volume_cc(self, value):
+        logger.info(f"Volume CC changed to {value}")
+
+    def _setup_midi_handling(self):
+        """Initialize MIDI handling components"""
+        # Enable receiving all MIDI messages
+        self._c_instance.set_feedback_channels(list(range(16)))
+        with self.component_guard():
+            logger.info("Create listeners for all MIDI CC messages")
+            for channel in range(16):  # All MIDI channels
+                for cc_num in range(128):  # All CC numbers
+                    self.register_cc_listener(channel, cc_num)
+
+    def receive_midi(self, midi_bytes):
+        logger.info("MIDI RECEIVED!")
+        logger.info(midi_bytes)
+        """Process incoming MIDI messages"""
+        if not midi_bytes:
+            return
+
+        try:
+            status_byte = midi_bytes[0] & 0xF0  # Mask channel bits
+            
+            # MIDI CC Message (Control Change)
+            if status_byte == 0xB0:
+                channel = midi_bytes[0] & 0x0F
+                cc_number = midi_bytes[1]
+                value = midi_bytes[2]
+                logger.debug(f"MIDI CC: ch{channel+1} cc{cc_number} val{value}")
+                self._handle_cc(channel, cc_number, value)
+            
+            # MIDI Note Messages
+            elif status_byte in (0x90, 0x80):
+                channel = midi_bytes[0] & 0x0F
+                note_number = midi_bytes[1]
+                velocity = midi_bytes[2]
+                is_note_on = status_byte == 0x90 and velocity > 0
+                logger.debug(f"MIDI Note: ch{channel+1} note{note_number} vel{velocity}")
+                self._handle_note(channel, note_number, is_note_on, velocity)
+            
+            # MIDI SYSEX Messages
+            elif midi_bytes[0] == 0xF0 and midi_bytes[-1] == 0xF7:
+                logger.debug("MIDI SYSEX received")
+                self._handle_sysex(midi_bytes[1:-1])
+            
+            else:
+                # Let Live handle other messages
+                super(Manager, self).receive_midi(midi_bytes)
+                
+        except Exception as e:
+            logger.error(f"MIDI processing error: {str(e)}")
+
+    def _handle_cc(self, value, sender):
+        logger.info("Handle incoming CC messages")
+        channel = sender.message_channel() + 1  # Convert to 1-based channel
+        cc_num = sender.message_identifier()
+        logger.info(
+            f"CC CH{channel:02d} #{cc_num:03d} = {value:03d}"
+        )
+        test_sysex = bytes([cc_num, value])
+        self.send_sysex(test_sysex)
+
+    def _handle_note(self, channel, note_number, is_on, velocity):
+        """Process incoming Note messages"""
+        key = (channel, note_number)
+        if key in self._note_listeners:
+            for callback in self._note_listeners[key]:
+                try:
+                    callback(is_on, velocity)
+                except Exception as e:
+                    logger.error(f"Note callback error: {str(e)}")
+
+    def _handle_sysex(self, data):
+        logger.info("SYSEX RECEIVED!!!")
+        logger.info(data)
+        """Process incoming SYSEX messages"""
+        for callback in self._sysex_listeners:
+            try:
+                callback(data)
+            except Exception as e:
+                logger.error(f"SYSEX callback error: {str(e)}")
+
+    # MIDI Registration Methods
+    def register_cc_listener(self, channel, cc_number):
+        """Create and configure a single CC listener"""
+        cc = SliderElement(MIDI_CC_TYPE, channel, cc_number)
+        # Fixed: Now properly captures sender reference in the lambda
+        cc.add_value_listener(
+            lambda value, sender=cc: self._handle_cc(value, sender),
+            identify_sender=True
+        )
+        self._cc_listeners.append(cc)
+
+    def register_note_listener(self, channel, note_number, callback):
+        logger.info("Register callback for Note messages (channel: 0-15)")
+
+    def register_sysex_listener(self, callback):
+        logger.info("Register callback for SYSEX messages")
+
+    def send_midi_cc(self, channel, cc_num, value):
+        """Send a MIDI CC message"""
+        # Correct way to send MIDI in Ableton scripts
+        self._send_midi(tuple([0xB0 | (channel & 0x0F), cc_num & 0x7F, value & 0x7F]))
+
+    def send_midi_note(self, channel, note, velocity):
+        """Send a MIDI Note message"""
+        self._send_midi(tuple([0x90 | (channel & 0x0F), note & 0x7F, velocity & 0x7F]))
+
+    def send_sysex(self, sysex_bytes):
+        masked_data = [byte & 0x7F for byte in sysex_bytes] 
+        self._send_midi((0xF0, *masked_data, 0xF7))
+
+    # Original Manager methods remain unchanged below this point
     def start_logging(self):
         """
         Start logging to a local logfile (logs/abletonosc.log),
@@ -54,7 +169,7 @@ class Manager(ControlSurface):
                 try:
                     self.osc_server.send("/live/error", (message,))
                 except OSError:
-                    # If the connection is dead, silently ignore errors as there's not much more we can do
+                    # If the connection is dead, silently ignore errors
                     pass
         self.live_osc_error_handler = LiveOSCErrorLogHandler()
         self.live_osc_error_handler.setLevel(logging.ERROR)
@@ -101,12 +216,7 @@ class Manager(ControlSurface):
             handler.clear_api()
 
     def tick(self):
-        """
-        Called once per 100ms "tick".
-        Live's embedded Python implementation does not appear to support threading,
-        and beachballs when a thread is started. Instead, this approach allows long-running
-        processes such as the OSC server to perform operations.
-        """
+        """Called once per 100ms 'tick'"""
         logger.debug("Tick...")
         self.osc_server.process()
         self.schedule_message(1, self.tick)
@@ -134,15 +244,6 @@ class Manager(ControlSurface):
 
     def disconnect(self):
         logger.info("Disconnecting...")
-        logger.info("Disconnecting...")
         self.stop_logging()
         self.osc_server.shutdown()
         super().disconnect()
-
-    def build_midi_map(self, midi_map_handle):
-        self.midi_router.build_midi_map(midi_map_handle)
-        super(Manager, self).build_midi_map(midi_map_handle)  
-    
-    def receive_midi(self, midi_bytes):
-        self.midi_router.receive_midi(midi_bytes)
-          

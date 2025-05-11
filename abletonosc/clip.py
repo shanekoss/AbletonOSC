@@ -93,6 +93,21 @@ class ClipHandler(AbletonOSCHandler):
             "end_marker",
         ]
 
+        def send_clip_name_midi(clip, params: Tuple[Any] = ()):
+            self.logger.info(f"clip name is {clip.name}")
+            self.logger.info("params:")
+            self.logger.info(params)
+            # Encode the clip name (drops non-ASCII chars)
+            clip_name_bytes = clip.name.encode('ascii', errors='ignore')
+
+            # Construct the full SysEx message by combining:
+            # - The fixed parts (26 and params[0] as integers)
+            # - The encoded string bytes
+            sysex_message = bytes([26, params[0]]) + clip_name_bytes
+            self.manager.send_sysex(sysex_message)
+
+        self.osc_server.add_handler("/live/clip/send_clip_name", create_clip_callback(send_clip_name_midi, pass_clip_index=True))
+            
         for method in methods:
             self.osc_server.add_handler("/live/clip/%s" % method,
                                         create_clip_callback(self._call_method, method))
