@@ -3,6 +3,7 @@ from ableton.v2.control_surface.elements import SliderElement, ButtonElement, En
 from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYPE
 
 from . import abletonosc
+from .track_processor import TrackProcessor
 import importlib
 import traceback
 import logging
@@ -21,7 +22,6 @@ class Manager(ControlSurface):
         self._cc_listeners = []
         self._note_listeners = []
         self._sysex_listeners = []
-
         try:
             self.osc_server = abletonosc.OSCServer()
             self.schedule_message(0, self.tick)
@@ -32,6 +32,11 @@ class Manager(ControlSurface):
             logger.info("AbletonOSC: Listening for OSC on port %d" % abletonosc.OSC_LISTEN_PORT)
         except OSError as msg:
             logger.error("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
+
+        self.track_processor = TrackProcessor()
+        self.track_processor.manager = self
+        self.track_processor.logger = logger
+        self.track_processor.processTracks(self.song.tracks)
 
     def handle_volume_cc(self, value):
         logger.info(f"Volume CC changed to {value}")
@@ -86,7 +91,6 @@ class Manager(ControlSurface):
             logger.error(f"MIDI processing error: {str(e)}")
 
     def _handle_cc(self, value, sender):
-        logger.info("Handle incoming CC messages")
         channel = sender.message_channel() + 1  # Convert to 1-based channel
         cc_num = sender.message_identifier()
         self.processCCMessage(channel, cc_num, value)
@@ -95,14 +99,7 @@ class Manager(ControlSurface):
         # self.send_sysex(test_sysex)
 
     def _handle_note(self, channel, note_number, is_on, velocity):
-        """Process incoming Note messages"""
-        key = (channel, note_number)
-        if key in self._note_listeners:
-            for callback in self._note_listeners[key]:
-                try:
-                    callback(is_on, velocity)
-                except Exception as e:
-                    logger.error(f"Note callback error: {str(e)}")
+        self.processNoteMessage(channel, note_number, velocity)
 
     def _handle_sysex(self, data):
         logger.info("SYSEX RECEIVED!!!")
@@ -203,12 +200,18 @@ class Manager(ControlSurface):
                 abletonosc.ApplicationHandler(self),
                 abletonosc.ClipHandler(self),
                 abletonosc.ClipSlotHandler(self),
-                abletonosc.TrackHandler(self),
                 abletonosc.DeviceHandler(self),
+                abletonosc.TrackHandler(self),
                 abletonosc.ViewHandler(self),
                 abletonosc.SceneHandler(self)
             ]
 
+    def get_handler_by_identifier(self, identifier: str):
+        """Returns the first handler with matching class_identifier or None if not found."""
+        return next(
+            (handler for handler in self.handlers if handler.class_identifier == identifier),
+            None  # Default if not found
+        )
     def clear_api(self):
         self.osc_server.clear_handlers()
         for handler in self.handlers:
@@ -247,11 +250,30 @@ class Manager(ControlSurface):
         self.osc_server.shutdown()
         super().disconnect()
 
+    # TODO: move these process functions to another file!
     def processCCMessage(self, channel, cc_num, value):
         handled = False
         if channel == 1:
             if cc_num == 16:
                 handled = True
-                self.song.tracks[0].clip_slots[value].fire()
+                bankAIndex = value
+                self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[value].fire()
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
+    
+    def processNoteMessage(self, channel, note, velocity):
+        handled = False
+        if channel == 1:
+            if 0 <= note <= 15:
+                if velocity == 1:
+                    handled = True
+                    self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[self.track_processor.bankATempoIndex].fire()
+                    self.logger.info(f"Stop Loop{note+1}")
+                elif velocity == 2:
+                    handled = True
+                    # TODO: do we really want to do this this way?
+                    self.song.tracks[self.track_processor.loop_tracks[note]].stop_all_clips()
+                    self.logger.info(f"Fire Loop{note+1}")
+
+        if handled == False:
+            logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")

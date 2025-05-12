@@ -58,6 +58,7 @@ class AbletonOSCHandler(Component):
             params:
             getter:
         """
+    
         def property_changed_callback():
             if getter is None:
                 value = getattr(target, prop)
@@ -65,6 +66,7 @@ class AbletonOSCHandler(Component):
                 if midi_callback is None:
                     value = getter(params)
                 else:
+                    self.logger.info(f"Start Listen called with {target.name}, prop: {prop} and params:{params}")
                     value = getter(target, params)
             if type(value) is not tuple:
                 value = (value,)
