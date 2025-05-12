@@ -1,5 +1,5 @@
 from typing import Tuple, Any, Callable, Optional, List
-from .abletonosc.constants import LOOPTRACK_NAMES, BANK_A_TEMPO
+from .abletonosc.constants import LOOPTRACK_NAMES, BANK_A_TEMPO, BANK_B_OFFSET
 
 import Live
 import logging
@@ -28,9 +28,21 @@ class TrackProcessor():
                         self.logger.info(f"LOOPTRACK {loop_index} is {track.name}")
                         self.loop_tracks[loop_index] = index
                     continue
-        # set up bank a fired index listener:
-        if self.bankATempoIndex != -1:
-            new_array_with_bank_index = [self.bankATempoIndex] + self.loop_tracks[:8]
-            self.logger.info(f"setting up damn handler with {new_array_with_bank_index}")
-            self.manager.get_handler_by_identifier("track").create_track_callback_for_loop_fired_index(new_array_with_bank_index)
                     
+    def sendBankANames(self, bank_a_index):
+        for index, track_index in enumerate(self.loop_tracks[:8]):
+            clip_name =" "
+            if self.manager.song.tracks[track_index].clip_slots[bank_a_index].clip != None:
+                clip_name = self.manager.song.tracks[track_index].clip_slots[bank_a_index].clip.name
+            clip_name_bytes = clip_name.encode('ascii', errors='ignore')
+            sysex_message = bytes([26, index]) + clip_name_bytes
+            self.manager.send_sysex(sysex_message)
+    def sendBankBNames(self, bank_b_index):
+        for index, track_index in enumerate(self.loop_tracks[8:]):
+            clip_name =" "
+
+            if bank_b_index < len(self.manager.song.tracks[track_index].clip_slots) and self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip != None:
+                clip_name = self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip.name
+            clip_name_bytes = clip_name.encode('ascii', errors='ignore')
+            sysex_message = bytes([26, index + BANK_B_OFFSET]) + clip_name_bytes
+            self.manager.send_sysex(sysex_message)

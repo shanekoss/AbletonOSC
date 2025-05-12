@@ -3,11 +3,9 @@ from .handler import AbletonOSCHandler
 
 
 class TrackHandler(AbletonOSCHandler):
-    create_track_callback_for_loop_fired_index: Callable[[Optional[Tuple[Any]]], None]
     def __init__(self, manager):
         super().__init__(manager)
         self.class_identifier = "track"
-        self.bank_a_fired_callback = None
     def init_api(self):
         def create_track_callback(func: Callable,
                                   *args,
@@ -62,44 +60,6 @@ class TrackHandler(AbletonOSCHandler):
             "solo",
             "name"
         ]
-
-
-        def send_clip_name_for_fired_index(track, params: Tuple[Any] = ()):
-            fired_index = track.fired_slot_index
-            if fired_index == -1:
-                fired_index = track.playing_slot_index
-            if fired_index != -1:
-                for index, track_index in enumerate(params[1:]):
-                    clip_name =" "
-                    if self.song.tracks[track_index].clip_slots[fired_index].clip != None:
-                        clip_name = self.song.tracks[track_index].clip_slots[fired_index].clip.name
-                    clip_name_bytes = clip_name.encode('ascii', errors='ignore')
-                    sysex_message = bytes([26, index]) + clip_name_bytes
-                    self.manager.send_sysex(sysex_message)
-            else:
-                self.logger.info("send_clip_name_for_fired_index was -1!")
-                self.logger.info(track.name)
-                self.logger.info(len(track.clip_slots))
-                self.logger.info(fired_index)
-                self.logger.info(f"ALL PARAMS: {params}")
-                self.logger.info(f"PARAMS: {params[1:]}")
-
-        self.osc_server.add_handler("/live/track/start_listen_send_midi/fired_slot_index",
-                                        create_track_callback(self._start_listen, "fired_slot_index", include_track_id=True, getter=send_clip_name_for_fired_index, midi_callback=True))
-        
-        def create_track_callback_for_loop_fired_index(params: List[Any]) -> None:
-            """Callback for fired slot index events."""
-            self.bank_a_fired_callback = create_track_callback(
-                self._start_listen,
-                "fired_slot_index",
-                include_track_id=True,
-                getter=send_clip_name_for_fired_index,
-                midi_callback=True
-            )
-            if params:  # Handle params if needed
-                self.logger.info(f"Received params: {params}")
-                self.bank_a_fired_callback(params)
-        self.create_track_callback_for_loop_fired_index = create_track_callback_for_loop_fired_index
         
         for method in methods:
             self.osc_server.add_handler("/live/track/%s" % method,

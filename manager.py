@@ -257,7 +257,15 @@ class Manager(ControlSurface):
             if cc_num == 16:
                 handled = True
                 bankAIndex = value
-                self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[value].fire()
+                if bankAIndex >= len(self.song.tracks[self.track_processor.bankATempoIndex].clip_slots):
+                    logger.warning(f"bank a index {bankAIndex} is out of range!")
+                else:
+                    self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[value].fire()
+                    self.track_processor.sendBankANames(value)
+            if cc_num == 17:
+                handled = True
+                bankBIndex = value
+                self.track_processor.sendBankBNames(value)
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
     
