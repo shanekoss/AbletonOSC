@@ -1,7 +1,7 @@
 import os
 import sys
 import tempfile
-import Live
+import Live # type: ignore
 import json
 from functools import partial
 from typing import Tuple, Any

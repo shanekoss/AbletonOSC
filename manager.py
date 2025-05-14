@@ -1,14 +1,15 @@
-from ableton.v2.control_surface import ControlSurface
-from ableton.v2.control_surface.elements import SliderElement, ButtonElement, EncoderElement
-from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYPE
+from ableton.v2.control_surface import ControlSurface # type: ignore
+from ableton.v2.control_surface.elements import SliderElement, ButtonElement, EncoderElement # type: ignore
+from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYPE # type: ignore
 
 from . import abletonosc
 from .track_processor import TrackProcessor
+from .preset_manager import PresetManager
 import importlib
 import traceback
 import logging
 import os
-import Live
+import Live # type: ignore
 
 logger = logging.getLogger("abletonosc")
 
@@ -33,6 +34,9 @@ class Manager(ControlSurface):
         except OSError as msg:
             logger.error("Couldn't bind to port %d (%s)" % (abletonosc.OSC_LISTEN_PORT, msg))
 
+        self.preset_mananger = PresetManager(c_instance)
+        self.preset_mananger.logger = logger
+        self.preset_mananger.save_current_set_as_preset("TestSet")
         self.track_processor = TrackProcessor()
         self.track_processor.manager = self
         self.track_processor.logger = logger

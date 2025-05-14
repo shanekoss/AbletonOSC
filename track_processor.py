@@ -1,7 +1,7 @@
 from typing import Tuple, Any, Callable, Optional, List
 from .abletonosc.constants import LOOPTRACK_NAMES, BANK_A_TEMPO, BANK_B_OFFSET
 
-import Live
+import Live # type: ignore
 import logging
 
 class TrackProcessor():
