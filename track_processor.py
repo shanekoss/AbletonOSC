@@ -11,6 +11,8 @@ class TrackProcessor():
         self.manager = None
         self.logger = None
         self.bankATempoIndex = -1
+        self.currentBankAIndex = -1
+        self.currentBankBIndex = -1
     def processTracks(self, tracks: List[Live.Track.Track]):
         self.logger.info("PROCESSING THE FUCKING TRACKS!")
         for index, track in enumerate(tracks):

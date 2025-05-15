@@ -21,7 +21,7 @@ class PresetManager:
         """
         self._c_instance = c_instance
         self._presets_dir = os.path.expanduser("~/AbletonPresets")
-        self._current_preset = None
+        self.preset_path = os.path.join(self._presets_dir, "LaurieRigPresets.json")
         self.logger = None
         # Ensure presets directory exists
         os.makedirs(self._presets_dir, exist_ok=True)
@@ -32,7 +32,7 @@ class PresetManager:
     
     # --- Preset Management Methods ---
     
-    def save_current_set_as_preset(self, preset_name):
+    def save_current_set_as_preset(self, preset_name, preset_index):
         """
         Save the current Live set as a JSON preset.
         
@@ -43,18 +43,17 @@ class PresetManager:
             live_set = self._c_instance.song()
             preset_data = self._extract_set_data(live_set)
             
-            preset_path = os.path.join(self._presets_dir, f"{preset_name}.json")
             
-            with open(preset_path, 'w') as f:
+            
+            with open(self.preset_path, 'w') as f:
                 json.dump(preset_data, f, indent=2)
                 
-            self._current_preset = preset_name
             return True
         except Exception as e:
             self.logger.error(f"Error saving preset: {str(e)}")
             return False
     
-    def load_preset_into_set(self, preset_name):
+    def load_preset_into_set(self, preset_index):
         """
         Load a JSON preset into the current Live set.
         
@@ -62,19 +61,21 @@ class PresetManager:
             preset_name (str): Name of the preset to load
         """
         try:
-            preset_path = os.path.join(self._presets_dir, f"{preset_name}.json")
-            
-            if not os.path.exists(preset_path):
-                self.logger.error(f"Preset '{preset_name}' not found")
+            if not os.path.exists(self.preset_path):
+                self.logger.error(f"Preset File Not Found")
                 return False
                 
-            with open(preset_path, 'r') as f:
-                preset_data = json.load(f, object_pairs_hook=OrderedDict)
+            with open(self.preset_path, 'r') as f:
+                loaded_data = json.load(f, object_pairs_hook=OrderedDict)
+                if preset_index >= len(loaded_data):
+                    self.logger.error(f"Preset index {preset_index} does not exist!")
+                    return
+                else:
+                    preset_data = loaded_data[preset_index]
                 
             live_set = self._c_instance.song()
             self._apply_set_data(live_set, preset_data)
             
-            self._current_preset = preset_name
             return True
         except Exception as e:
             self.logger.error(f"Error loading preset: {str(e)}")

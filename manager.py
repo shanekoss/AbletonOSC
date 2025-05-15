@@ -5,6 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS
 import importlib
 import traceback
 import logging
@@ -51,9 +52,10 @@ class Manager(ControlSurface):
         self._c_instance.set_feedback_channels(list(range(16)))
         with self.component_guard():
             logger.info("Create listeners for all MIDI CC messages")
-            for channel in range(16):  # All MIDI channels
-                for cc_num in range(128):  # All CC numbers
-                    self.register_cc_listener(channel, cc_num)
+            for cc_type in CC_LISTENERS:
+                self.register_cc_listener(cc_type[1], cc_type[0])
+            for note_type in NOTE_LISTENERS:
+                self.register_note_listener(note_type[1], note_type[0])
 
     def receive_midi(self, midi_bytes):
         logger.info("MIDI RECEIVED!")
@@ -95,14 +97,14 @@ class Manager(ControlSurface):
             logger.error(f"MIDI processing error: {str(e)}")
 
     def _handle_cc(self, value, sender):
-        channel = sender.message_channel() + 1  # Convert to 1-based channel
+        channel = sender.message_channel()
         cc_num = sender.message_identifier()
         self.processCCMessage(channel, cc_num, value)
 
         # test_sysex = bytes([cc_num, value])
         # self.send_sysex(test_sysex)
 
-    def _handle_note(self, channel, note_number, is_on, velocity):
+    def _handle_note(self, channel, note_number, velocity):
         self.processNoteMessage(channel, note_number, velocity)
 
     def _handle_sysex(self, data):
@@ -119,15 +121,20 @@ class Manager(ControlSurface):
     def register_cc_listener(self, channel, cc_number):
         """Create and configure a single CC listener"""
         cc = SliderElement(MIDI_CC_TYPE, channel, cc_number)
-        # Fixed: Now properly captures sender reference in the lambda
         cc.add_value_listener(
             lambda value, sender=cc: self._handle_cc(value, sender),
             identify_sender=True
         )
         self._cc_listeners.append(cc)
 
-    def register_note_listener(self, channel, note_number, callback):
-        logger.info("Register callback for Note messages (channel: 0-15)")
+    def register_note_listener(self, channel, note_number):
+        """Create and configure a single Note listener"""
+        nl = ButtonElement(True, MIDI_NOTE_TYPE, channel, note_number)
+        # Fixed: Now properly captures sender reference in the lambda
+        nl.add_value_listener(
+            lambda value: self._handle_note(channel, note_number, value),
+        )
+        self._note_listeners.append(nl)
 
     def register_sysex_listener(self, callback):
         logger.info("Register callback for SYSEX messages")
@@ -257,33 +264,42 @@ class Manager(ControlSurface):
     # TODO: move these process functions to another file!
     def processCCMessage(self, channel, cc_num, value):
         handled = False
-        if channel == 1:
+        if channel == 0:
             if cc_num == 16:
                 handled = True
-                bankAIndex = value
-                if bankAIndex >= len(self.song.tracks[self.track_processor.bankATempoIndex].clip_slots):
-                    logger.warning(f"bank a index {bankAIndex} is out of range!")
+                self.track_processor.currentBankAIndex = value
+                if self.track_processor.currentBankAIndex >= len(self.song.tracks[self.track_processor.bankATempoIndex].clip_slots):
+                    logger.warning(f"bank a index {self.track_processor.currentBankAIndex} is out of range!")
+                else:
+                    if self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[self.track_processor.currentBankAIndex].has_clip:
+                        self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[self.track_processor.currentBankAIndex].clip.fire()
+                    else:
+                        logger.warning(f"Clip slot {self.track_processor.currentBankAIndex} for bankA has no tempo clip!")
+                    self.track_processor.sendBankANames(self.track_processor.currentBankAIndex)
             if cc_num == 17:
                 handled = True
-                bankBIndex = value
-                self.track_processor.sendBankBNames(value)
+                self.track_processor.currentBankBIndex = value
+                self.track_processor.sendBankBNames(self.track_processor.currentBankBIndex)
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
     
     def processNoteMessage(self, channel, note, velocity):
         handled = False
-        if channel == 1:
+        if channel == 0:
             if 0 <= note <= 15:
+                clip_slot_index = self.track_processor.currentBankAIndex if note < 8 else self.track_processor.currentBankBIndex
                 if velocity == 1:
                     handled = True
                     # TODO: do we really want to do this this way?
-                    self.song.tracks[self.track_processor.loop_tracks[note]].stop_all_clips()
+                    self.song.tracks[self.track_processor.loop_tracks[note]].stop_all_clips(False)
                     logger.info(f"Stop Loop{note+1}")
                 elif velocity == 2:
                     handled = True
-                    logger(f"Track index {self.track_processor.loop_tracks[note]} clip slot {self.track_processor.bankATempoIndex} fire!")
-                    self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[self.track_processor.bankATempoIndex].fire()
-                    logger.info(f"Start Loop{note+1}")
-
+                    if self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[clip_slot_index].has_clip:
+                        logger.info(f"Track index {self.track_processor.loop_tracks[note]} clip slot {clip_slot_index} fire!")
+                        self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[clip_slot_index].clip.fire()
+                        logger.info(f"Start Loop{note+1}")
+                    else:
+                        logger.warning(f"Clip slot {clip_slot_index} for Loop{note+1} has no clip!")
         if handled == False:
             logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")

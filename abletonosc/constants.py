@@ -99,3 +99,27 @@ PRESET_INCLUDE_TRACKS = [
     {"name": "Vocoder Stereo", "observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     {"name": "Tide/FX Stereo", "observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
 ]
+
+CC_LISTENERS = [
+    [16, 0],
+    [17, 0]
+]
+
+NOTE_LISTENERS = [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [3, 0],
+    [4, 0],
+    [5, 0],
+    [6, 0],
+    [7, 0],
+    [8, 0],
+    [9, 0],
+    [10, 0],
+    [11, 0],
+    [12, 0],
+    [13, 0],
+    [14, 0],
+    [15, 0]
+]
