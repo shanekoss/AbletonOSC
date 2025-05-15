@@ -120,39 +120,40 @@ class PresetManager:
             track_data = self._extract_track_data(track)
             if track_data != None:
                 data['tracks'].append(track_data)
-        
-        # Scenes
-        data['scenes'] = []
-        for scene in live_set.scenes:
-            scene_data = self._extract_scene_data(scene)
-            data['scenes'].append(scene_data)
-
-        self.logger.info("DATA SO FAR:")
-        self.logger.info(data)
         return data
     
     def _extract_track_data(self, track):
         """Extract data from a single track."""
-        track_data = OrderedDict()
-        track_name = track.name
-        if track_name in PRESET_INCLUDE_TRACKS:
-            track_data['name'] = track_name
+        foundTrack = next((element for element in PRESET_INCLUDE_TRACKS if element["name"] == track.name), None)
+        if foundTrack is not None:
+            track_data = OrderedDict()
+            track_data['name'] = track.name
             track_data['mute'] = track.mute
             track_data['volume'] = track.mixer_device.volume.value
+            track_data['sends'] = []
+            for send in track.mixer_device.sends:
+                param_data = {
+                    'name': send.name,
+                    'value': send.value,
+                    'min': send.min,
+                    'max': send.max,
+                    'is_quantized': send.is_quantized
+                }
+                track_data['sends'].append(param_data)
             track_data['panning'] = track.mixer_device.panning.value
             
-            # Devices
-            track_data['devices'] = []
-            for device in track.devices:
-                device_data = self._extract_device_data(device)
-                track_data['devices'].append(device_data)
+            # # Devices
+            # track_data['devices'] = []
+            # for device in track.devices:
+            #     device_data = self._extract_device_data(device)
+            #     track_data['devices'].append(device_data)
                 
-            # Clips
-            track_data['clips'] = []
-            for clip_slot in track.clip_slots:
-                if clip_slot.has_clip:
-                    clip_data = self._extract_clip_data(clip_slot.clip)
-                    track_data['clips'].append(clip_data)
+            # # Clips
+            # track_data['clips'] = []
+            # for clip_slot in track.clip_slots:
+            #     if clip_slot.has_clip:
+            #         clip_data = self._extract_clip_data(clip_slot.clip)
+            #         track_data['clips'].append(clip_data)
                     
             return track_data
         else:
@@ -207,13 +208,6 @@ class PresetManager:
         #         clip_data['notes'].append(note_data)
                 
         return clip_data
-    
-    def _extract_scene_data(self, scene):
-        """Extract data from a scene."""
-        scene_data = OrderedDict()
-        scene_data['name'] = scene.name
-        scene_data['color'] = scene.color
-        return scene_data
     
     # --- Data Application Methods ---
     

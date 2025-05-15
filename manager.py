@@ -263,9 +263,6 @@ class Manager(ControlSurface):
                 bankAIndex = value
                 if bankAIndex >= len(self.song.tracks[self.track_processor.bankATempoIndex].clip_slots):
                     logger.warning(f"bank a index {bankAIndex} is out of range!")
-                else:
-                    self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[value].fire()
-                    self.track_processor.sendBankANames(value)
             if cc_num == 17:
                 handled = True
                 bankBIndex = value
@@ -279,13 +276,14 @@ class Manager(ControlSurface):
             if 0 <= note <= 15:
                 if velocity == 1:
                     handled = True
-                    self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[self.track_processor.bankATempoIndex].fire()
-                    self.logger.info(f"Stop Loop{note+1}")
-                elif velocity == 2:
-                    handled = True
                     # TODO: do we really want to do this this way?
                     self.song.tracks[self.track_processor.loop_tracks[note]].stop_all_clips()
-                    self.logger.info(f"Fire Loop{note+1}")
+                    logger.info(f"Stop Loop{note+1}")
+                elif velocity == 2:
+                    handled = True
+                    logger(f"Track index {self.track_processor.loop_tracks[note]} clip slot {self.track_processor.bankATempoIndex} fire!")
+                    self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[self.track_processor.bankATempoIndex].fire()
+                    logger.info(f"Start Loop{note+1}")
 
         if handled == False:
             logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")

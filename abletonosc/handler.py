@@ -1,4 +1,4 @@
-from ableton.v2.control_surface.component import Component
+from ableton.v2.control_surface.component import Component # type: ignore
 from typing import Optional, Tuple, Any
 import logging
 from .osc_server import OSCServer
