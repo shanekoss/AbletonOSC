@@ -37,7 +37,7 @@ class Manager(ControlSurface):
 
         self.preset_mananger = PresetManager(c_instance)
         self.preset_mananger.logger = logger
-        self.preset_mananger.save_current_set_as_preset("TestSet")
+        self.preset_mananger.initialize_presets_file()
         self.track_processor = TrackProcessor()
         self.track_processor.manager = self
         self.track_processor.logger = logger
@@ -276,10 +276,16 @@ class Manager(ControlSurface):
                     else:
                         logger.warning(f"Clip slot {self.track_processor.currentBankAIndex} for bankA has no tempo clip!")
                     self.track_processor.sendBankANames(self.track_processor.currentBankAIndex)
-            if cc_num == 17:
+            elif cc_num == 17:
                 handled = True
                 self.track_processor.currentBankBIndex = value
                 self.track_processor.sendBankBNames(self.track_processor.currentBankBIndex)
+            elif cc_num == 19:
+                handled = True
+                self.preset_mananger.load_preset_into_set(value)
+            elif cc_num == 20:
+                handled = True
+                self.preset_mananger.save_current_set_as_preset(value)
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
     

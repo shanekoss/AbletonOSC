@@ -2,6 +2,7 @@
 # Constants used in AbletonOSC
 #--------------------------------------------------------------------------------
 
+MIDI_TRANSPOSER_DEVICE = "midiTransposer_p"
 OSC_LISTEN_PORT = 11000
 OSC_RESPONSE_PORT = 11001
 BANK_B_OFFSET = 8
@@ -101,25 +102,27 @@ PRESET_INCLUDE_TRACKS = [
 ]
 
 CC_LISTENERS = [
-    [16, 0],
-    [17, 0]
+    [16, 0], #BANK A LOOP SELECT
+    [17, 0], #BANK B LOOP SELECT
+    [19, 0], #LOAD PRESET
+    [20, 0], #SAVE PRESET
 ]
 
 NOTE_LISTENERS = [
-    [0, 0],
-    [1, 0],
-    [2, 0],
-    [3, 0],
-    [4, 0],
-    [5, 0],
-    [6, 0],
-    [7, 0],
-    [8, 0],
-    [9, 0],
-    [10, 0],
-    [11, 0],
-    [12, 0],
-    [13, 0],
-    [14, 0],
-    [15, 0]
+    [0, 0], #LOOPA TRIGGER 1
+    [1, 0], #LOOPA TRIGGER 2
+    [2, 0], #LOOPA TRIGGER 3
+    [3, 0], #LOOPA TRIGGER 4
+    [4, 0], #LOOPA TRIGGER 5
+    [5, 0], #LOOPA TRIGGER 6
+    [6, 0], #LOOPA TRIGGER 7
+    [7, 0], #LOOPA TRIGGER 8
+    [8, 0], #LOOPB TRIGGER 1
+    [9, 0], #LOOPB TRIGGER 2
+    [10, 0], #LOOPB TRIGGER 3
+    [11, 0], #LOOPB TRIGGER 4
+    [12, 0], #LOOPB TRIGGER 5
+    [13, 0], #LOOPB TRIGGER 6
+    [14, 0], #LOOPB TRIGGER 7
+    [15, 0]  #LOOPB TRIGGER 8
 ]
