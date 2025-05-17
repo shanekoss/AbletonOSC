@@ -2,7 +2,7 @@ import json
 import os
 from collections import OrderedDict
 from pathlib import Path
-from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE
+from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE, CHAINS_TO_IGNORE_TRANSPOSE
 
 import logging
 
@@ -188,8 +188,6 @@ class PresetManager:
             elif PRESET_INCLUDE_TRACKS[track.name]["hasChains"] == True:
                 #TODO: check each step of the way that names of racks, chains, etc are as expected
                 instrument_rack = track.devices[0]
-                self.logger.info("instrument rack!")
-                self.logger.info(instrument_rack)
                 track_data['chains'] = []
                 for index, chain in enumerate(instrument_rack.chains):
                     drum_rack_data = []
@@ -197,27 +195,35 @@ class PresetManager:
                     for index, drum_rack_chain in enumerate(drum_rack.chains):
                         drum_rack_chain_device_data = []
                         transpose_device = None
-                        for device in drum_rack_chain.devices:        
-                            transpose_device = self._extract_device_data(device, MIDI_TRANSPOSER_DEVICE)
-                            if transpose_device is not None:
-                                break
-                        if transpose_device is None:
-                            self.logger.warning(f"MidiTranpose device not found for {track.name}")
+                        if drum_rack_chain.name not in CHAINS_TO_IGNORE_TRANSPOSE:
+                            for device in drum_rack_chain.devices:
+                                transpose_device = self._extract_device_data(device, MIDI_TRANSPOSER_DEVICE)
+                                if transpose_device is not None:
+                                    break
+                            if transpose_device is None:
+                                self.logger.warning(f"MidiTranpose device not found for {drum_rack_chain.name}")
                         drum_rack_chain_data = {
                             'name': drum_rack_chain.name,
                             'index': index,
                             'volume': drum_rack_chain.mixer_device.volume.value,
-                            'tideA': drum_rack_chain.mixer_device.sends[0].value,
-                            'tideB': drum_rack_chain.mixer_device.sends[1].value,
-                            'transpose_device': transpose_device
+                            'transpose_device': transpose_device,
+                            **({
+                                'tideA': drum_rack_chain.mixer_device.sends[0].value,
+                                'tideB': drum_rack_chain.mixer_device.sends[1].value
+                            } if len(drum_rack_chain.mixer_device.sends) >= 2 else {})
                         }
                         drum_rack_data.append(drum_rack_chain_data)
 
                     chain_data = {
                         'name': chain.name,
                         'index': index,
-                        'drum_rack chains' : drum_rack_data
+                        'drum_rack chains' : drum_rack_data,
+                        #HANDLE FootSynth of FOOTS as it is unique
+                         **({
+                            'volume': chain.mixer_device.volume.value
+                        } if chain.name == "FootSynth" else {})
                     }
+
                     track_data['chains'].append(chain_data)
 
             
@@ -229,7 +235,7 @@ class PresetManager:
     def _extract_device_data(self, device, device_name = None):
         """Extract data from a device."""
         device_data = OrderedDict()
-        if device_name != None and device.name != device_name:
+        if device_name != None and not device_name in  device.name:
             return None
         device_data['name'] = device.name
         
@@ -312,7 +318,7 @@ class PresetManager:
                 # TODO:validate this is the right param
                 track.devices[0].parameters[track_data['transpose_device']['parameters']['transpose']['index']].value = track_data['transpose_device']['parameters']['transpose']['value']
         else:
-            self.logger.info("NOPE - DIDNT GO IN!")
+            self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
         # # Devices - simplified
         # for i, device_data in enumerate(track_data.get('devices', [])):
         #     if i < len(track.devices):

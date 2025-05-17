@@ -2,7 +2,7 @@
 # Constants used in AbletonOSC
 #--------------------------------------------------------------------------------
 
-MIDI_TRANSPOSER_DEVICE = "midiTransposer_p"
+MIDI_TRANSPOSER_DEVICE = "midiTransposer"
 OSC_LISTEN_PORT = 11000
 OSC_RESPONSE_PORT = 11001
 BANK_B_OFFSET = 8
@@ -33,7 +33,7 @@ PRESET_INCLUDE_TRACKS = {
     "SYNTH1": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": True, "hasChains": True},
     "SYNTH2": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": True, "hasChains": True},
     "SYNTH3": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": True, "hasChains": True},
-    "FOOT": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": True, "hasChains": False},
+    "FOOT": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": True, "hasChains": True},
     "violin": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "violin2": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "mic": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
@@ -131,3 +131,7 @@ NOTE_LISTENERS = [
 PARAMS_TO_CACHE = {
     MIDI_TRANSPOSER_DEVICE: ["program", "transpose"],
 }
+
+CHAINS_TO_IGNORE_TRANSPOSE = [
+    "FootLoops"
+]
