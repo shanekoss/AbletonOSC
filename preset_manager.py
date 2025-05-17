@@ -2,7 +2,7 @@ import json
 import os
 from collections import OrderedDict
 from pathlib import Path
-from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE
+from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE
 
 import logging
 
@@ -149,16 +149,7 @@ class PresetManager:
         # Basic set information
         data['name'] = live_set.name
         data['tempo'] = live_set.tempo
-        data['time_signature'] = {
-            'numerator': live_set.signature_numerator,
-            'denominator': live_set.signature_denominator
-        }
-        data['loop'] = {
-            'start': live_set.loop_start,
-            'length': live_set.loop_length,
-            'enabled': live_set.loop
-        }
-        
+ 
         # Tracks
         data['tracks'] = []
         for track in live_set.tracks:
@@ -169,24 +160,22 @@ class PresetManager:
     
     def _extract_track_data(self, track):
         """Extract data from a single track."""
-        foundTrack = next((element for element in PRESET_INCLUDE_TRACKS if element["name"] == track.name), None)
-        if foundTrack is not None:
+        if track.name in PRESET_INCLUDE_TRACKS:
+        
             track_data = OrderedDict()
             track_data['name'] = track.name
             track_data['mute'] = track.mute
             track_data['volume'] = track.mixer_device.volume.value
             track_data['sends'] = []
-            for send in track.mixer_device.sends:
+            for index, send in enumerate(track.mixer_device.sends):
                 param_data = {
                     'name': send.name,
                     'value': send.value,
-                    'min': send.min,
-                    'max': send.max,
-                    'is_quantized': send.is_quantized
+                    'index': index,
                 }
                 track_data['sends'].append(param_data)
             track_data['panning'] = track.mixer_device.panning.value
-            if foundTrack["hasTransp"] == True:
+            if PRESET_INCLUDE_TRACKS[track.name]["hasTransp"] == True and PRESET_INCLUDE_TRACKS[track.name]["hasChains"] == False:
                 transpose_device = None
                 for device in track.devices:
                     transpose_device = self._extract_device_data(device, MIDI_TRANSPOSER_DEVICE)
@@ -195,21 +184,41 @@ class PresetManager:
                 if transpose_device is None:
                     self.logger.warning(f"MidiTranpose device not found for {track.name}")
                 else:
-                    self.logger.info("BOOM")
-                    self.logger.info(transpose_device)
                     track_data['transpose_device'] = transpose_device
-            # # Devices
-            # track_data['devices'] = []
-            # for device in track.devices:
-            #     device_data = self._extract_device_data(device)
-            #     track_data['devices'].append(device_data)
-                
-            # # Clips
-            # track_data['clips'] = []
-            # for clip_slot in track.clip_slots:
-            #     if clip_slot.has_clip:
-            #         clip_data = self._extract_clip_data(clip_slot.clip)
-            #         track_data['clips'].append(clip_data)
+            elif PRESET_INCLUDE_TRACKS[track.name]["hasChains"] == True:
+                #TODO: check each step of the way that names of racks, chains, etc are as expected
+                instrument_rack = track.devices[0]
+                self.logger.info("instrument rack!")
+                self.logger.info(instrument_rack)
+                track_data['chains'] = []
+                for index, chain in enumerate(instrument_rack.chains):
+                    drum_rack_data = []
+                    drum_rack = chain.devices[0]
+                    for index, drum_rack_chain in enumerate(drum_rack.chains):
+                        drum_rack_chain_device_data = []
+                        transpose_device = None
+                        for device in drum_rack_chain.devices:        
+                            transpose_device = self._extract_device_data(device, MIDI_TRANSPOSER_DEVICE)
+                            if transpose_device is not None:
+                                break
+                        if transpose_device is None:
+                            self.logger.warning(f"MidiTranpose device not found for {track.name}")
+                        drum_rack_chain_data = {
+                            'name': drum_rack_chain.name,
+                            'index': index,
+                            'volume': drum_rack_chain.mixer_device.volume.value,
+                            'transpose_device': transpose_device
+                        }
+                        drum_rack_data.append(drum_rack_chain_data)
+
+                    chain_data = {
+                        'name': chain.name,
+                        'index': index,
+                        'drum_rack chains' : drum_rack_data
+                    }
+                    track_data['chains'].append(chain_data)
+
+            
                     
             return track_data
         else:
@@ -225,16 +234,16 @@ class PresetManager:
         device_data['type'] = device.type
         
         # Parameters
-        device_data['parameters'] = []
-        for param in device.parameters:
-            param_data = {
-                'name': param.name,
-                'value': param.value,
-                'min': param.min,
-                'max': param.max,
-                'is_quantized': param.is_quantized
-            }
-            device_data['parameters'].append(param_data)
+        device_data['parameters'] = {}
+        for index, param in enumerate(device.parameters):
+            # Only cache the params we care about, if specified in PARAMS_TO_CACHE
+            if device_name is not None and param.name not in PARAMS_TO_CACHE[device_name]:
+                continue
+            else:
+                device_data['parameters'][param.name] = {
+                    'value': param.value,
+                    'index': index,
+                }
                 
         return device_data
     
@@ -280,34 +289,38 @@ class PresetManager:
         # Basic set properties
         live_set.tempo = preset_data.get('tempo', live_set.tempo)
         
-        time_sig = preset_data.get('time_signature', {})
-        live_set.signature_numerator = time_sig.get('numerator')
-        live_set.signature_denominator = time_sig.get('denominator')
-        
-        loop = preset_data.get('loop', {})
-        live_set.loop_start = loop.get('start')
-        live_set.loop_length = loop.get('length')
-        live_set.loop = loop.get('enabled')
-        
-        # Tracks - this is simplified for the example
-        # In a real implementation, you'd need to handle track creation/matching
-        for i, track_data in enumerate(preset_data.get('tracks', [])):
-            if i < len(live_set.tracks):
-                self._apply_track_data(live_set.tracks[i], track_data)
+        for track in live_set.tracks:
+            found_track_data = next((tr for tr in preset_data.get('tracks', []) if tr.get("name") == track.name), None)
+            if found_track_data is not None:
+                self._apply_track_data(track, found_track_data)
+
+        # for i, track_data in enumerate(preset_data.get('tracks', [])):
+        #     if i < len(live_set.tracks):
+        #         self._apply_track_data(live_set.tracks[i], track_data)
     
     def _apply_track_data(self, track, track_data):
         """Apply data to a single track."""
-        track.name = track_data.get('name', track.name)
-        track.color = track_data.get('color', track.color)
         track.mute = track_data.get('mute', track.mute)
         track.solo = track_data.get('solo', track.solo)
         track.mixer_device.volume.value = track_data.get('volume', track.mixer_device.volume.value)
         track.mixer_device.panning.value = track_data.get('panning', track.mixer_device.panning.value)
-        
-        # Devices - simplified
-        for i, device_data in enumerate(track_data.get('devices', [])):
-            if i < len(track.devices):
-                self._apply_device_data(track.devices[i], device_data)
+        for send in track_data['sends']:
+            if track.mixer_device.sends[send['index']].name != send['name']:
+                self.logger.warning(f"Expecting send {track.mixer_device.sends[send['index']]} but found {track.mixer_device.sends[send['index']].name}!!!")
+            track.mixer_device.sends[send['index']].value = send['value']
+
+        if 'transpose_device' in track_data:
+            if track.devices[0].name != MIDI_TRANSPOSER_DEVICE:
+                self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
+            else:
+                # TODO:validate this is the right param
+                track.devices[0].parameters[track_data['transpose_device']['parameters']['transpose']['index']].value = track_data['transpose_device']['parameters']['transpose']['value']
+        else:
+            self.logger.info("NOPE - DIDNT GO IN!")
+        # # Devices - simplified
+        # for i, device_data in enumerate(track_data.get('devices', [])):
+        #     if i < len(track.devices):
+        #         self._apply_device_data(track.devices[i], device_data)
     
     def _apply_device_data(self, device, device_data):
         """Apply data to a device."""
