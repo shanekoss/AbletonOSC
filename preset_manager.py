@@ -207,6 +207,8 @@ class PresetManager:
                             'name': drum_rack_chain.name,
                             'index': index,
                             'volume': drum_rack_chain.mixer_device.volume.value,
+                            'tideA': drum_rack_chain.mixer_device.sends[0].value,
+                            'tideB': drum_rack_chain.mixer_device.sends[1].value,
                             'transpose_device': transpose_device
                         }
                         drum_rack_data.append(drum_rack_chain_data)
@@ -230,8 +232,6 @@ class PresetManager:
         if device_name != None and device.name != device_name:
             return None
         device_data['name'] = device.name
-        device_data['class_name'] = device.class_name
-        device_data['type'] = device.type
         
         # Parameters
         device_data['parameters'] = {}
@@ -293,10 +293,6 @@ class PresetManager:
             found_track_data = next((tr for tr in preset_data.get('tracks', []) if tr.get("name") == track.name), None)
             if found_track_data is not None:
                 self._apply_track_data(track, found_track_data)
-
-        # for i, track_data in enumerate(preset_data.get('tracks', [])):
-        #     if i < len(live_set.tracks):
-        #         self._apply_track_data(live_set.tracks[i], track_data)
     
     def _apply_track_data(self, track, track_data):
         """Apply data to a single track."""
