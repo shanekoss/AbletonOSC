@@ -13,6 +13,7 @@ class TrackProcessor():
         self.bankATempoIndex = -1
         self.currentBankAIndex = -1
         self.currentBankBIndex = -1
+        self.track_listeners = []
     def processTracks(self, tracks: List[Live.Track.Track]):
         self.logger.info("PROCESSING THE FUCKING TRACKS!")
         for index, track in enumerate(tracks):
@@ -29,8 +30,19 @@ class TrackProcessor():
                     else:
                         self.logger.info(f"LOOPTRACK {loop_index} is {track.name}")
                         self.loop_tracks[loop_index] = index
+                        listener = lambda t=track, l=loop_index: self._on_playing_slot_index_changed(t, l)
+                        track.add_playing_slot_index_listener(listener)
+                        self.track_listeners.append((track, listener))  # Store for cleanup
                     continue
-                    
+
+    def _on_playing_slot_index_changed(self, track, loop_index):
+        loop_state = 3
+        slot_index = track.playing_slot_index
+        if slot_index >= 0:
+            #TODO: do we want to verify slot_index matches the loop bank expected?
+            loop_state = 4
+        self.manager.send_midi_note(0, loop_index, loop_state)
+
     def sendBankANames(self, bank_a_index):
         for index, track_index in enumerate(self.loop_tracks[:8]):
             clip_name =" "
@@ -48,3 +60,10 @@ class TrackProcessor():
             clip_name_bytes = clip_name.encode('ascii', errors='ignore')
             sysex_message = bytes([26, index + BANK_B_OFFSET]) + clip_name_bytes
             self.manager.send_sysex(sysex_message)
+
+    def disconnect(self):
+        """Remove all listeners on script shutdown"""
+        for track, listener in self.track_listeners:
+            if track.playing_slot_index_has_listener(listener):
+                track.remove_playing_slot_index_listener(listener)
+        self.track_listeners = []  # Clear the list
