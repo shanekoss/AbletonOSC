@@ -189,10 +189,10 @@ class PresetManager:
                 #TODO: check each step of the way that names of racks, chains, etc are as expected
                 instrument_rack = track.devices[0]
                 track_data['chains'] = []
-                for index, chain in enumerate(instrument_rack.chains):
+                for chain_index, chain in enumerate(instrument_rack.chains):
                     drum_rack_data = []
                     drum_rack = chain.devices[0]
-                    for index, drum_rack_chain in enumerate(drum_rack.chains):
+                    for drum_chain_index, drum_rack_chain in enumerate(drum_rack.chains):
                         drum_rack_chain_device_data = []
                         transpose_device = None
                         if drum_rack_chain.name not in CHAINS_TO_IGNORE_TRANSPOSE:
@@ -204,7 +204,7 @@ class PresetManager:
                                 self.logger.warning(f"MidiTranpose device not found for {drum_rack_chain.name}")
                         drum_rack_chain_data = {
                             'name': drum_rack_chain.name,
-                            'index': index,
+                            'index': drum_chain_index,
                             'volume': drum_rack_chain.mixer_device.volume.value,
                             'transpose_device': transpose_device,
                             **({
@@ -216,8 +216,8 @@ class PresetManager:
 
                     chain_data = {
                         'name': chain.name,
-                        'index': index,
-                        'drum_rack chains' : drum_rack_data,
+                        'index': chain_index,
+                        'drum_rack_chains' : drum_rack_data,
                         #HANDLE FootSynth of FOOTS as it is unique
                          **({
                             'volume': chain.mixer_device.volume.value
@@ -310,19 +310,51 @@ class PresetManager:
             if track.mixer_device.sends[send['index']].name != send['name']:
                 self.logger.warning(f"Expecting send {track.mixer_device.sends[send['index']]} but found {track.mixer_device.sends[send['index']].name}!!!")
             track.mixer_device.sends[send['index']].value = send['value']
+    
+        if PRESET_INCLUDE_TRACKS[track.name]["hasChains"] == True:
+            for chain in track_data['chains']:
+                if track.devices[0].chains[chain['index']].name != chain['name']:
+                    self.logger.warning(f"{track.name} chain {chain['index']} is {track.devices[0].chains[chain['index']].name} but was expecting {chain['name']}")
+                else:
+                    for drum_rack_chain in chain['drum_rack_chains']:
+                        if track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name != drum_rack_chain['name']:
+                            self.logger.warning(f"{track.name} chain {chain['index']}, drum_rack_chain index {drum_rack_chain['index']} is {track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name} but was expecting {drum_rack_chain['name']}")
+                        else:
+                            #chain volume
+                            track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].mixer_device.volume.value = drum_rack_chain['volume']
+                            #chain sends
+                            for drum_rack_send in track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].mixer_device.sends:
+                                if drum_rack_send.name == "tideA":
+                                    drum_rack_send.value = drum_rack_chain['tideA']
+                                elif drum_rack_send.name == "tideB":
+                                    drum_rack_send.value = drum_rack_chain['tideB']
+                            #chain transpose and pgm
+                            transpose_device_found = False
+                            if track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name in CHAINS_TO_IGNORE_TRANSPOSE:
+                                transpose_device_found = True
+                            else:
+                                for chain_device in track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].devices:
+                                    if MIDI_TRANSPOSER_DEVICE in chain_device.name:
+                                        for transpose_param in drum_rack_chain['transpose_device']['parameters']:
+                                            transpose_param_details = drum_rack_chain['transpose_device']['parameters'][transpose_param]
+                                            if chain_device.parameters[transpose_param_details['index']].name != transpose_param:
+                                                self.logger.warning(f"{track.name} chain {track.devices[0].chains[chain['index']].name} parameter {transpose_param_details['index']} is {chain_device.parameters[transpose_param_details['index']].name} not the expected {transpose_param}")
+                                            else:
+                                                chain_device.parameters[transpose_param_details['index']].value = transpose_param_details['value']
+                                        transpose_device_found = True
+                                        break
+                                if transpose_device_found is False:
+                                    self.logger.warning(f"Transpose device for {track.name} chain: {track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name} not found!!!")
 
-        if 'transpose_device' in track_data:
-            if track.devices[0].name != MIDI_TRANSPOSER_DEVICE:
-                self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
+        elif PRESET_INCLUDE_TRACKS[track.name]["hasTransp"]:
+            if 'transpose_device' in track_data:
+                if MIDI_TRANSPOSER_DEVICE not in track.devices[0].name:
+                    self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
+                else:
+                    # TODO:validate this is the right param
+                    track.devices[0].parameters[track_data['transpose_device']['parameters']['transpose']['index']].value = track_data['transpose_device']['parameters']['transpose']['value']
             else:
-                # TODO:validate this is the right param
-                track.devices[0].parameters[track_data['transpose_device']['parameters']['transpose']['index']].value = track_data['transpose_device']['parameters']['transpose']['value']
-        else:
-            self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
-        # # Devices - simplified
-        # for i, device_data in enumerate(track_data.get('devices', [])):
-        #     if i < len(track.devices):
-        #         self._apply_device_data(track.devices[i], device_data)
+                self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
     
     def _apply_device_data(self, device, device_data):
         """Apply data to a device."""
