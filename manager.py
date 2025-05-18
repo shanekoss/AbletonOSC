@@ -24,6 +24,10 @@ class Manager(ControlSurface):
         self._cc_listeners = []
         self._note_listeners = []
         self._sysex_listeners = []
+
+        self.bankATempoIndex = -1
+        self.currentBankAIndex = -1
+        self.currentBankBIndex = -1
         try:
             self.osc_server = abletonosc.OSCServer()
             self.schedule_message(0, self.tick)
@@ -37,6 +41,7 @@ class Manager(ControlSurface):
 
         self.preset_mananger = PresetManager(c_instance)
         self.preset_mananger.logger = logger
+        self.preset_mananger.manager = self
         self.preset_mananger.initialize_presets_file()
         self.track_processor = TrackProcessor()
         self.track_processor.manager = self
@@ -267,19 +272,10 @@ class Manager(ControlSurface):
         if channel == 0:
             if cc_num == 16:
                 handled = True
-                self.track_processor.currentBankAIndex = value
-                if self.track_processor.currentBankAIndex >= len(self.song.tracks[self.track_processor.bankATempoIndex].clip_slots):
-                    logger.warning(f"bank a index {self.track_processor.currentBankAIndex} is out of range!")
-                else:
-                    if self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[self.track_processor.currentBankAIndex].has_clip:
-                        self.song.tracks[self.track_processor.bankATempoIndex].clip_slots[self.track_processor.currentBankAIndex].clip.fire()
-                    else:
-                        logger.warning(f"Clip slot {self.track_processor.currentBankAIndex} for bankA has no tempo clip!")
-                    self.track_processor.sendBankANames(self.track_processor.currentBankAIndex)
+                self.track_processor.setBankALoops(value)
             elif cc_num == 17:
                 handled = True
-                self.track_processor.currentBankBIndex = value
-                self.track_processor.sendBankBNames(self.track_processor.currentBankBIndex)
+                self.track_processor.setBankBLoops(value)
             elif cc_num == 19:
                 handled = True
                 self.preset_mananger.load_preset_into_set(value)
@@ -293,7 +289,7 @@ class Manager(ControlSurface):
         handled = False
         if channel == 0:
             if 0 <= note <= 15:
-                clip_slot_index = self.track_processor.currentBankAIndex if note < 8 else self.track_processor.currentBankBIndex
+                clip_slot_index = self.currentBankAIndex if note < 8 else self.currentBankBIndex
                 if velocity == 1:
                     handled = True
                     # TODO: do we really want to do this this way?

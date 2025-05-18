@@ -94,9 +94,6 @@ class ClipHandler(AbletonOSCHandler):
         ]
 
         def send_clip_name_midi(clip, params: Tuple[Any] = ()):
-            self.logger.info(f"clip name is {clip.name}")
-            self.logger.info("params:")
-            self.logger.info(params)
             # Encode the clip name (drops non-ASCII chars)
             clip_name_bytes = clip.name.encode('ascii', errors='ignore')
 

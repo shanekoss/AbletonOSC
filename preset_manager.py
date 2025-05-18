@@ -2,7 +2,7 @@ import json
 import os
 from collections import OrderedDict
 from pathlib import Path
-from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE, CHAINS_TO_IGNORE_TRANSPOSE
+from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE, CHAINS_TO_IGNORE_TRANSPOSE, LOOPTRACK_NAMES
 
 import logging
 
@@ -23,7 +23,9 @@ class PresetManager:
         self._presets_dir = os.path.expanduser("~/AbletonPresets")
         self.preset_path = os.path.join(self._presets_dir, "LaurieRigPresets.json")
         self.logger = None
-        
+        self.manager = None
+
+        self.loop_autostart = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
         # Ensure presets directory exists
         os.makedirs(self._presets_dir, exist_ok=True)
         
@@ -57,6 +59,9 @@ class PresetManager:
             live_set = self._c_instance.song()
             preset_data = self._extract_set_data(live_set)
             
+            preset_data['BankA'] = self.manager.currentBankAIndex
+            preset_data['BankB'] = self.manager.currentBankBIndex
+
             # Initialize presets array
             presets = []
             
@@ -148,7 +153,6 @@ class PresetManager:
         
         # Basic set information
         data['name'] = live_set.name
-        data['tempo'] = live_set.tempo
  
         # Tracks
         data['tracks'] = []
@@ -223,8 +227,8 @@ class PresetManager:
 
                     track_data['chains'].append(chain_data)
 
-            
-                    
+            if track.name in LOOPTRACK_NAMES:
+                track_data['auto_start'] = True if track.playing_slot_index >= 0 else False
             return track_data
         else:
             return None
@@ -289,14 +293,27 @@ class PresetManager:
             live_set: The Live set object
             preset_data (dict): The preset data to apply
         """
-        # Basic set properties
-        live_set.tempo = preset_data.get('tempo', live_set.tempo)
-        
+        self.loop_autostart = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
         for track in live_set.tracks:
             found_track_data = next((tr for tr in preset_data.get('tracks', []) if tr.get("name") == track.name), None)
             if found_track_data is not None:
                 self._apply_track_data(track, found_track_data)
-    
+
+        # set loop banks
+        self.manager.track_processor.setBankALoops(preset_data['BankA'])
+        self.manager.track_processor.setBankBLoops(preset_data['BankB'])
+
+        # autostart loops
+        for loop_index, should_start in enumerate(self.loop_autostart):
+            if should_start == True:
+                track_index = self.manager.bankATempoIndex + loop_index + 1
+                clip_slot_index = self.manager.currentBankAIndex if loop_index < 8 else self.manager.currentBankBIndex
+                if live_set.tracks[track_index].clip_slots[clip_slot_index].has_clip:
+                    self.logger.info(f"I'm gonna fire LOOP{track_index+1}")
+                    live_set.tracks[track_index].clip_slots[clip_slot_index].clip.fire()
+                else:
+                    self.logger.warning(f"Track {track_index} clip_slot {clip_slot_index} has no clip - can not auto start!")
+
     def _apply_track_data(self, track, track_data):
         """Apply data to a single track."""
         track.mute = track_data.get('mute', track.mute)
@@ -318,8 +335,6 @@ class PresetManager:
                         if track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name != drum_rack_chain['name']:
                             self.logger.warning(f"{track.name} chain {chain['index']}, drum_rack_chain index {drum_rack_chain['index']} is {track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name} but was expecting {drum_rack_chain['name']}")
                         else:
-                            self.logger.info("Data:")
-                            self.logger.info(drum_rack_chain)
                             #chain sends
                             for drum_rack_send in track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].mixer_device.sends:
                                 if drum_rack_send.name == "tideA":
@@ -353,6 +368,17 @@ class PresetManager:
                     track.devices[0].parameters[track_data['transpose_device']['parameters']['transpose']['index']].value = track_data['transpose_device']['parameters']['transpose']['value']
             else:
                 self.logger.warning(f"Either transpose device has been moved or renamed for track {track.name}!!!")
+        
+        if track.name in LOOPTRACK_NAMES:
+            loop_digit = ''.join(filter(str.isdigit, track.name))
+            if loop_digit:
+                loop_index = int(loop_digit) - 1
+                if 'auto_start' in track_data:
+                    self.loop_autostart[loop_index] = track_data['auto_start']
+                else:
+                    self.logger.warning(f"{track.name} doesn't have an entry for auto_start!")
+            else:
+                self.logger.warrning(f"No integer found in name {track.name}")
     
     def _apply_device_data(self, device, device_data):
         """Apply data to a device."""

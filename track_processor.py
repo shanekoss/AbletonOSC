@@ -10,17 +10,11 @@ class TrackProcessor():
         self.loop_tracks = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         self.manager = None
         self.logger = None
-        self.bankATempoIndex = -1
-        self.currentBankAIndex = -1
-        self.currentBankBIndex = -1
         self.track_listeners = []
     def processTracks(self, tracks: List[Live.Track.Track]):
-        self.logger.info("PROCESSING THE FUCKING TRACKS!")
         for index, track in enumerate(tracks):
-            self.logger.info(f"FOUND TRACK {track.name} with index: {index}")
             if track.name == BANK_A_TEMPO:
-                self.logger.info(f"bankATempoIndex index is {index}!")
-                self.bankATempoIndex = index
+                self.manager.bankATempoIndex = index
                 continue
             if track.name in LOOPTRACK_NAMES:
                 loop_index = LOOPTRACK_NAMES.index(track.name)
@@ -43,6 +37,27 @@ class TrackProcessor():
             loop_state = 4
         self.manager.send_midi_note(0, loop_index, loop_state)
 
+    def setBankALoops(self, new_bank_a_index):
+        for loop_track_index in range(1, 9):
+            track_index = self.manager.bankATempoIndex + loop_track_index
+            self.manager.song.tracks[track_index].stop_all_clips(False)
+        self.manager.currentBankAIndex = new_bank_a_index
+        if self.manager.currentBankAIndex >= len(self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots):
+            self.logger.warning(f"bank a index {self.currentBankAIndex} is out of range!")
+        else:
+            if self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots[self.manager.currentBankAIndex].has_clip:
+                self.manager.song.tempo = float(self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots[self.manager.currentBankAIndex].clip.name)
+            else:
+                self.logger.warning(f"Clip slot {self.manager.currentBankAIndex} for bankA has no tempo clip!")
+            self.sendBankANames(self.manager.currentBankAIndex)
+
+    def setBankBLoops(self, new_bank_b_index):
+        for loop_track_index in range(9, 17):
+            track_index = self.manager.bankATempoIndex + loop_track_index
+            self.manager.song.tracks[track_index].stop_all_clips(False)
+        self.manager.currentBankBIndex = new_bank_b_index
+        self.sendBankBNames(self.manager.currentBankBIndex)
+
     def sendBankANames(self, bank_a_index):
         for index, track_index in enumerate(self.loop_tracks[:8]):
             clip_name =" "
@@ -51,10 +66,10 @@ class TrackProcessor():
             clip_name_bytes = clip_name.encode('ascii', errors='ignore')
             sysex_message = bytes([26, index]) + clip_name_bytes
             self.manager.send_sysex(sysex_message)
+
     def sendBankBNames(self, bank_b_index):
         for index, track_index in enumerate(self.loop_tracks[8:]):
             clip_name =" "
-
             if bank_b_index < len(self.manager.song.tracks[track_index].clip_slots) and self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip != None:
                 clip_name = self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip.name
             clip_name_bytes = clip_name.encode('ascii', errors='ignore')
