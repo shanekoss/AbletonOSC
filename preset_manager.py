@@ -218,10 +218,7 @@ class PresetManager:
                         'name': chain.name,
                         'index': chain_index,
                         'drum_rack_chains' : drum_rack_data,
-                        #HANDLE FootSynth of FOOTS as it is unique
-                         **({
-                            'volume': chain.mixer_device.volume.value
-                        } if chain.name == "FootSynth" else {})
+                        'volume': chain.mixer_device.volume.value
                     }
 
                     track_data['chains'].append(chain_data)
@@ -315,13 +312,14 @@ class PresetManager:
             for chain in track_data['chains']:
                 if track.devices[0].chains[chain['index']].name != chain['name']:
                     self.logger.warning(f"{track.name} chain {chain['index']} is {track.devices[0].chains[chain['index']].name} but was expecting {chain['name']}")
-                else:
+                else:                         #chain volume
+                    track.devices[0].chains[chain['index']].mixer_device.volume.value = chain['volume']
                     for drum_rack_chain in chain['drum_rack_chains']:
                         if track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name != drum_rack_chain['name']:
                             self.logger.warning(f"{track.name} chain {chain['index']}, drum_rack_chain index {drum_rack_chain['index']} is {track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].name} but was expecting {drum_rack_chain['name']}")
                         else:
-                            #chain volume
-                            track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].mixer_device.volume.value = drum_rack_chain['volume']
+                            self.logger.info("Data:")
+                            self.logger.info(drum_rack_chain)
                             #chain sends
                             for drum_rack_send in track.devices[0].chains[chain['index']].devices[0].chains[drum_rack_chain['index']].mixer_device.sends:
                                 if drum_rack_send.name == "tideA":
