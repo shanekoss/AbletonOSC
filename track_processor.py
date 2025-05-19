@@ -37,11 +37,12 @@ class TrackProcessor():
             loop_state = 4
         self.manager.send_midi_note(0, loop_index, loop_state)
 
-    def setBankALoops(self, new_bank_a_index):
+    def setBankALoops(self, new_bank_a_index, should_send_midi = False):
         for loop_track_index in range(1, 9):
             track_index = self.manager.bankATempoIndex + loop_track_index
             self.manager.song.tracks[track_index].stop_all_clips(False)
         self.manager.currentBankAIndex = new_bank_a_index
+        self.logger.info(f"Set bank a to {self.manager.currentBankAIndex}")
         if self.manager.currentBankAIndex >= len(self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots):
             self.logger.warning(f"bank a index {self.currentBankAIndex} is out of range!")
         else:
@@ -50,13 +51,20 @@ class TrackProcessor():
             else:
                 self.logger.warning(f"Clip slot {self.manager.currentBankAIndex} for bankA has no tempo clip!")
             self.sendBankANames(self.manager.currentBankAIndex)
+            if should_send_midi:
+                #TODO: replace magic number with enum
+                self.manager.send_midi_cc(0, 16, self.manager.currentBankAIndex)
 
-    def setBankBLoops(self, new_bank_b_index):
+    def setBankBLoops(self, new_bank_b_index, should_send_midi = False):
         for loop_track_index in range(9, 17):
             track_index = self.manager.bankATempoIndex + loop_track_index
             self.manager.song.tracks[track_index].stop_all_clips(False)
         self.manager.currentBankBIndex = new_bank_b_index
+        self.logger.info(f"Set bank b to {self.manager.currentBankBIndex}")
         self.sendBankBNames(self.manager.currentBankBIndex)
+        if should_send_midi:
+            #TODO: replace magic number with enum
+            self.manager.send_midi_cc(0, 17, self.manager.currentBankBIndex)
 
     def sendBankANames(self, bank_a_index):
         for index, track_index in enumerate(self.loop_tracks[:8]):

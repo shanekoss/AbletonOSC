@@ -43,6 +43,7 @@ PRESET_INCLUDE_TRACKS = {
     "SuperVPlay": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "Sampler": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": True, "hasTransp": False, "hasChains": False},
     "BANKA": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
+    "BANKB": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "BANKaTEMPO": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "LOOP1": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "LOOP2": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},

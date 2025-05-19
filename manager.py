@@ -270,6 +270,7 @@ class Manager(ControlSurface):
     def processCCMessage(self, channel, cc_num, value):
         handled = False
         if channel == 0:
+            #TODO: replace these numbers with ENUMS
             if cc_num == 16:
                 handled = True
                 self.track_processor.setBankALoops(value)

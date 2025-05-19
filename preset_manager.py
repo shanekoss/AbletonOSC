@@ -300,16 +300,19 @@ class PresetManager:
                 self._apply_track_data(track, found_track_data)
 
         # set loop banks
-        self.manager.track_processor.setBankALoops(preset_data['BankA'])
-        self.manager.track_processor.setBankBLoops(preset_data['BankB'])
+        self.manager.track_processor.setBankALoops(preset_data['BankA'], True)
+        self.manager.track_processor.setBankBLoops(preset_data['BankB'], True)
 
         # autostart loops
         for loop_index, should_start in enumerate(self.loop_autostart):
             if should_start == True:
-                track_index = self.manager.bankATempoIndex + loop_index + 1
+                track_index = self.manager.bankATempoIndex + loop_index
+                if loop_index >= 8:
+                    #offset for BANKB track
+                    track_index = track_index + 1
                 clip_slot_index = self.manager.currentBankAIndex if loop_index < 8 else self.manager.currentBankBIndex
                 if live_set.tracks[track_index].clip_slots[clip_slot_index].has_clip:
-                    self.logger.info(f"I'm gonna fire LOOP{track_index+1}")
+                    self.logger.info(f"I'm gonna fire LOOP{loop_index+1}")
                     live_set.tracks[track_index].clip_slots[clip_slot_index].clip.fire()
                 else:
                     self.logger.warning(f"Track {track_index} clip_slot {clip_slot_index} has no clip - can not auto start!")
