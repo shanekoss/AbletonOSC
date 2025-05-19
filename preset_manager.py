@@ -306,7 +306,7 @@ class PresetManager:
         # autostart loops
         for loop_index, should_start in enumerate(self.loop_autostart):
             if should_start == True:
-                track_index = self.manager.bankATempoIndex + loop_index
+                track_index = self.manager.bankATempoIndex + loop_index + 1
                 if loop_index >= 8:
                     #offset for BANKB track
                     track_index = track_index + 1

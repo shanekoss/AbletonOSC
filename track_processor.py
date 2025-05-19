@@ -42,9 +42,8 @@ class TrackProcessor():
             track_index = self.manager.bankATempoIndex + loop_track_index
             self.manager.song.tracks[track_index].stop_all_clips(False)
         self.manager.currentBankAIndex = new_bank_a_index
-        self.logger.info(f"Set bank a to {self.manager.currentBankAIndex}")
         if self.manager.currentBankAIndex >= len(self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots):
-            self.logger.warning(f"bank a index {self.currentBankAIndex} is out of range!")
+            self.logger.warning(f"bank a index {self.manager.currentBankAIndex} is out of range!")
         else:
             if self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots[self.manager.currentBankAIndex].has_clip:
                 self.manager.song.tempo = float(self.manager.song.tracks[self.manager.bankATempoIndex].clip_slots[self.manager.currentBankAIndex].clip.name)
@@ -60,7 +59,6 @@ class TrackProcessor():
             track_index = self.manager.bankATempoIndex + loop_track_index
             self.manager.song.tracks[track_index].stop_all_clips(False)
         self.manager.currentBankBIndex = new_bank_b_index
-        self.logger.info(f"Set bank b to {self.manager.currentBankBIndex}")
         self.sendBankBNames(self.manager.currentBankBIndex)
         if should_send_midi:
             #TODO: replace magic number with enum
