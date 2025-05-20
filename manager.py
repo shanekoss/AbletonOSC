@@ -5,22 +5,27 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL
+from .timer import Timer
 import importlib
 import traceback
 import logging
+import math
 import os
 import Live # type: ignore
 
 logger = logging.getLogger("abletonosc")
 
+#TODO: refactor this file into multiple files - way too big
 class Manager(ControlSurface):
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
         self._c_instance = c_instance
+        self.fade_timer = Timer(FADER_TIMER_INTERVAL, self.timerFadeCallback)
         self.log_level = "info"
 
         # MIDI Handling Setup
+        #TODO: CLEAR THESE HANDLERS ON DISCONNECT
         self._cc_listeners = []
         self._note_listeners = []
         self._sysex_listeners = []
@@ -28,6 +33,9 @@ class Manager(ControlSurface):
         self.bankATempoIndex = -1
         self.currentBankAIndex = -1
         self.currentBankBIndex = -1
+        self.loopFadeStates = LOOP_FADE_STATES
+        self.fadeLoops = False
+        self.fadeSpeed = 0.01
         try:
             self.osc_server = abletonosc.OSCServer()
             self.schedule_message(0, self.tick)
@@ -48,6 +56,38 @@ class Manager(ControlSurface):
         self.track_processor.logger = logger
         self.track_processor.processTracks(self.song.tracks)
 
+    def timerFadeCallback(self):
+        should_stop_timer = True
+        for loop_index, (loop_name, loop_state) in enumerate(self.loopFadeStates.items()):
+            track_index = self.bankATempoIndex + loop_index + 1
+            if loop_index > 7:
+                #offset for bank b track
+                track_index = track_index + 1
+            current_volume = self.song.tracks[track_index].mixer_device.volume.value
+            if loop_state["state"] == LOOP_FADE_STATE.FADING_IN:
+                current_volume = current_volume + self.fadeSpeed * FADE_AMOUNT
+                if current_volume > FADER_ZERO:
+                    current_volume = FADER_ZERO
+                if current_volume == FADER_ZERO:
+                    loop_state["state"] = LOOP_FADE_STATE.FULL_VOLUME
+                else:
+                    should_stop_timer = False
+                self.schedule_message(1, self.set_track_volume, {"index": track_index, "value": current_volume})
+            elif loop_state["state"] == LOOP_FADE_STATE.FADING_OUT:
+                current_volume = current_volume - self.fadeSpeed * FADE_AMOUNT
+                if current_volume < 0:
+                    current_volume = 0
+                if current_volume == 0:
+                    loop_state["state"] = LOOP_FADE_STATE.VOLUME_ALL_DOWN
+                    self.schedule_message(1, self.stop_loops_on_track, track_index)
+                else:
+                    should_stop_timer = False
+                self.schedule_message(1, self.set_track_volume, {"index": track_index, "value": current_volume})
+        
+        #Stop timer if no loop is fading
+        return should_stop_timer
+        
+        
     def handle_volume_cc(self, value):
         logger.info(f"Volume CC changed to {value}")
 
@@ -63,7 +103,6 @@ class Manager(ControlSurface):
                 self.register_note_listener(note_type[1], note_type[0])
 
     def receive_midi(self, midi_bytes):
-        logger.info("MIDI RECEIVED!")
         logger.info(midi_bytes)
         """Process incoming MIDI messages"""
         if not midi_bytes:
@@ -222,6 +261,80 @@ class Manager(ControlSurface):
                 abletonosc.SceneHandler(self)
             ]
 
+    # TODO: move these process functions to another file!
+    def processCCMessage(self, channel, cc_num, value):
+        handled = False
+        if channel == 0:
+            if cc_num == Channel_1_CC.BANK_A_SELECT:
+                handled = True
+                self.track_processor.setBankALoops(value)
+            elif cc_num == Channel_1_CC.BANK_B_SELECT:
+                handled = True
+                self.track_processor.setBankBLoops(value)
+            elif cc_num == Channel_1_CC.LOAD_PRESET:
+                handled = True
+                self.preset_mananger.load_preset_into_set(value)
+            elif cc_num == Channel_1_CC.SAVE_PRESET:
+                handled = True
+                self.preset_mananger.save_current_set_as_preset(value)
+            elif cc_num == Channel_1_CC.LOOP_FADE:
+                handled = True
+                self.fadeLoops = False if value < 127 else True
+                if self.fadeLoops == False:
+                    self.fade_timer.stop()
+            elif cc_num == Channel_1_CC.LOOP_FADE_SPEED:
+                self.fadeSpeed =  max(0.01, min(1 - (value / 127.0), 1.0))   
+                handled = True
+        if handled == False:
+            logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
+    
+    def processNoteMessage(self, channel, note, velocity):
+        handled = False
+        if channel == 0:
+            if Channel_1_Note.LOOP1 <= note <= Channel_1_Note.LOOP16:
+                if velocity == LOOP_VELOCITY.STOP_LOOP:
+                    handled = True
+                    self.stop_loop(note)
+                elif velocity == LOOP_VELOCITY.START_LOOP:
+                    handled = True
+                    self.start_loop(note)
+        if handled == False:
+            logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")
+    
+    def start_loop(self, note):
+        is_bank_a = note < Channel_1_Note.LOOP9
+        clip_slot_index = self.currentBankAIndex if is_bank_a else self.currentBankBIndex
+        track_index = self.track_processor.loop_tracks[note]
+        if is_bank_a == False:
+            #offset for bank b
+            track_index + track_index + 1
+        if self.song.tracks[track_index].clip_slots[clip_slot_index].has_clip:
+            if self.fadeLoops:
+                if math.isclose(self.song.tracks[track_index].mixer_device.volume.value, FADER_ZERO, rel_tol=1e-3):
+                    self.song.tracks[track_index].mixer_device.volume.value = 0
+                self.loopFadeStates[f'LOOP{note + 1}']['state'] = LOOP_FADE_STATE.FADING_IN
+                if self.fade_timer.is_running() == False:
+                    self.fade_timer.start()
+            else:
+                self.song.tracks[track_index].mixer_device.volume.value = FADER_ZERO
+            self.song.tracks[track_index].clip_slots[clip_slot_index].clip.fire()
+        else:
+            logger.warning(f"Clip slot {clip_slot_index} for Loop{note+1} has no clip!")
+
+    def stop_loop(self, note):
+        if self.fadeLoops:
+            self.loopFadeStates[f'LOOP{note + 1}']['state'] = LOOP_FADE_STATE.FADING_OUT
+            if self.fade_timer.is_running() == False:
+                self.fade_timer.start()
+        else:
+            self.stop_loops_on_track(self.track_processor.loop_tracks[note])
+
+    def set_track_volume(self, data):
+        self.song.tracks[data['index']].mixer_device.volume.value = data['value']
+
+    def stop_loops_on_track(self, track_index):
+        self.song.tracks[track_index].stop_all_clips(False)
+
     def get_handler_by_identifier(self, identifier: str):
         """Returns the first handler with matching class_identifier or None if not found."""
         return next(
@@ -265,44 +378,3 @@ class Manager(ControlSurface):
         self.stop_logging()
         self.osc_server.shutdown()
         super().disconnect()
-
-    # TODO: move these process functions to another file!
-    def processCCMessage(self, channel, cc_num, value):
-        handled = False
-        if channel == 0:
-            #TODO: replace these numbers with ENUMS
-            if cc_num == 16:
-                handled = True
-                self.track_processor.setBankALoops(value)
-            elif cc_num == 17:
-                handled = True
-                self.track_processor.setBankBLoops(value)
-            elif cc_num == 19:
-                handled = True
-                self.preset_mananger.load_preset_into_set(value)
-            elif cc_num == 20:
-                handled = True
-                self.preset_mananger.save_current_set_as_preset(value)
-        if handled == False:
-            logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
-    
-    def processNoteMessage(self, channel, note, velocity):
-        handled = False
-        if channel == 0:
-            if 0 <= note <= 15:
-                clip_slot_index = self.currentBankAIndex if note < 8 else self.currentBankBIndex
-                if velocity == 1:
-                    handled = True
-                    # TODO: do we really want to do this this way?
-                    self.song.tracks[self.track_processor.loop_tracks[note]].stop_all_clips(False)
-                    logger.info(f"Stop Loop{note+1}")
-                elif velocity == 2:
-                    handled = True
-                    if self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[clip_slot_index].has_clip:
-                        logger.info(f"Track index {self.track_processor.loop_tracks[note]} clip slot {clip_slot_index} fire!")
-                        self.song.tracks[self.track_processor.loop_tracks[note]].clip_slots[clip_slot_index].clip.fire()
-                        logger.info(f"Start Loop{note+1}")
-                    else:
-                        logger.warning(f"Clip slot {clip_slot_index} for Loop{note+1} has no clip!")
-        if handled == False:
-            logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")

@@ -1,12 +1,15 @@
 #--------------------------------------------------------------------------------
 # Constants used in AbletonOSC
 #--------------------------------------------------------------------------------
+from enum import IntEnum
 
 MIDI_TRANSPOSER_DEVICE = "midiTransposer"
 OSC_LISTEN_PORT = 11000
 OSC_RESPONSE_PORT = 11001
 BANK_B_OFFSET = 8
-
+FADE_AMOUNT = 0.05
+FADER_ZERO = 0.85
+FADER_TIMER_INTERVAL = 0.1667
 BANK_A_TEMPO = "BANKaTEMPO"
 LOOPTRACK_NAMES = [
     "LOOP1",
@@ -103,32 +106,6 @@ PRESET_INCLUDE_TRACKS = {
     "Tide/FX Stereo": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False}
 }
 
-CC_LISTENERS = [
-    [16, 0], #BANK A LOOP SELECT
-    [17, 0], #BANK B LOOP SELECT
-    [19, 0], #LOAD PRESET
-    [20, 0], #SAVE PRESET
-]
-
-NOTE_LISTENERS = [
-    [0, 0], #LOOPA TRIGGER 1
-    [1, 0], #LOOPA TRIGGER 2
-    [2, 0], #LOOPA TRIGGER 3
-    [3, 0], #LOOPA TRIGGER 4
-    [4, 0], #LOOPA TRIGGER 5
-    [5, 0], #LOOPA TRIGGER 6
-    [6, 0], #LOOPA TRIGGER 7
-    [7, 0], #LOOPA TRIGGER 8
-    [8, 0], #LOOPB TRIGGER 1
-    [9, 0], #LOOPB TRIGGER 2
-    [10, 0], #LOOPB TRIGGER 3
-    [11, 0], #LOOPB TRIGGER 4
-    [12, 0], #LOOPB TRIGGER 5
-    [13, 0], #LOOPB TRIGGER 6
-    [14, 0], #LOOPB TRIGGER 7
-    [15, 0]  #LOOPB TRIGGER 8
-]
-
 PARAMS_TO_CACHE = {
     MIDI_TRANSPOSER_DEVICE: ["program", "transpose"],
 }
@@ -136,3 +113,96 @@ PARAMS_TO_CACHE = {
 CHAINS_TO_IGNORE_TRANSPOSE = [
     "FootLoops"
 ]
+
+class Channel_1_Note(IntEnum):
+    LOOP1 = 0
+    LOOP2 = 1
+    LOOP3 = 2
+    LOOP4 = 3
+    LOOP5 = 4
+    LOOP6 = 5
+    LOOP7 = 6
+    LOOP8 = 7
+    LOOP9 = 8
+    LOOP10 = 9
+    LOOP11 = 10
+    LOOP12 = 11
+    LOOP13 = 12
+    LOOP14 = 13
+    LOOP15 = 14
+    LOOP16 = 15
+
+class Channel_1_CC(IntEnum):
+    BANK_A_SELECT = 16
+    BANK_B_SELECT = 17
+    LOAD_PRESET = 19
+    SAVE_PRESET = 20
+    LOOP_FADE = 21
+    LOOP_FADE_SPEED = 22
+
+class LOOP_VELOCITY(IntEnum):
+    STOP_LOOP = 1
+    START_LOOP = 2
+
+class LOOP_STATE(IntEnum):
+    STOPPED = 3
+    PLAYING = 4
+
+class SYSEX_PREFIX(IntEnum):
+    LOOP_NAMES = 26
+
+
+CC_LISTENERS = [
+    [Channel_1_CC.BANK_A_SELECT, 0],
+    [Channel_1_CC.BANK_B_SELECT, 0],
+    [Channel_1_CC.LOAD_PRESET, 0],
+    [Channel_1_CC.SAVE_PRESET, 0],
+    [Channel_1_CC.LOOP_FADE, 0],
+    [Channel_1_CC.LOOP_FADE_SPEED, 0],
+]
+
+NOTE_LISTENERS = [
+    [Channel_1_Note.LOOP1, 0],
+    [Channel_1_Note.LOOP2, 0],
+    [Channel_1_Note.LOOP3, 0],
+    [Channel_1_Note.LOOP4, 0],
+    [Channel_1_Note.LOOP5, 0],
+    [Channel_1_Note.LOOP6, 0],
+    [Channel_1_Note.LOOP7, 0],
+    [Channel_1_Note.LOOP8, 0],
+    [Channel_1_Note.LOOP9, 0],
+    [Channel_1_Note.LOOP10, 0],
+    [Channel_1_Note.LOOP11, 0],
+    [Channel_1_Note.LOOP12, 0],
+    [Channel_1_Note.LOOP13, 0],
+    [Channel_1_Note.LOOP14, 0],
+    [Channel_1_Note.LOOP15, 0],
+    [Channel_1_Note.LOOP16, 0] 
+]
+
+class LOOP_FADE_STATE(IntEnum): 
+    NONE = 0
+    FADING_IN = 1
+    FADING_OUT = 2
+    FULL_VOLUME = 3
+    VOLUME_ALL_DOWN = 4
+
+LOOP_FADE_STATES = {
+    "LOOP1": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP2": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP3": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP4": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP5": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP6": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP7": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP8": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP9": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP10": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP11": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP12": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP13": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP14": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP15": {"state" : LOOP_FADE_STATE.NONE},
+    "LOOP16": {"state" : LOOP_FADE_STATE.NONE},
+
+}

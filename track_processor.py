@@ -1,5 +1,5 @@
 from typing import Tuple, Any, Callable, Optional, List
-from .abletonosc.constants import LOOPTRACK_NAMES, BANK_A_TEMPO, BANK_B_OFFSET
+from .abletonosc.constants import LOOPTRACK_NAMES, BANK_A_TEMPO, BANK_B_OFFSET, Channel_1_CC, Channel_1_Note, SYSEX_PREFIX, LOOP_STATE, FADER_ZERO
 
 import Live # type: ignore
 import logging
@@ -22,7 +22,7 @@ class TrackProcessor():
                     if loop_index >= len(self.loop_tracks):
                         self.logger.error(f"Loop Index ${loop_index} is out of range! BAD!")
                     else:
-                        self.logger.info(f"LOOPTRACK {loop_index} is {track.name}")
+                        track.mixer_device.volume.value = FADER_ZERO
                         self.loop_tracks[loop_index] = index
                         listener = lambda t=track, l=loop_index: self._on_playing_slot_index_changed(t, l)
                         track.add_playing_slot_index_listener(listener)
@@ -30,11 +30,11 @@ class TrackProcessor():
                     continue
 
     def _on_playing_slot_index_changed(self, track, loop_index):
-        loop_state = 3
+        loop_state = LOOP_STATE.STOPPED
         slot_index = track.playing_slot_index
         if slot_index >= 0:
             #TODO: do we want to verify slot_index matches the loop bank expected?
-            loop_state = 4
+            loop_state = LOOP_STATE.PLAYING
         self.manager.send_midi_note(0, loop_index, loop_state)
 
     def setBankALoops(self, new_bank_a_index, should_send_midi = False):
@@ -51,8 +51,7 @@ class TrackProcessor():
                 self.logger.warning(f"Clip slot {self.manager.currentBankAIndex} for bankA has no tempo clip!")
             self.sendBankANames(self.manager.currentBankAIndex)
             if should_send_midi:
-                #TODO: replace magic number with enum
-                self.manager.send_midi_cc(0, 16, self.manager.currentBankAIndex)
+                self.manager.send_midi_cc(0, Channel_1_CC.BANK_A_SELECT, self.manager.currentBankAIndex)
 
     def setBankBLoops(self, new_bank_b_index, should_send_midi = False):
         for loop_track_index in range(9, 17):
@@ -61,8 +60,7 @@ class TrackProcessor():
         self.manager.currentBankBIndex = new_bank_b_index
         self.sendBankBNames(self.manager.currentBankBIndex)
         if should_send_midi:
-            #TODO: replace magic number with enum
-            self.manager.send_midi_cc(0, 17, self.manager.currentBankBIndex)
+            self.manager.send_midi_cc(0, Channel_1_CC.BANK_B_SELECT, self.manager.currentBankBIndex)
 
     def sendBankANames(self, bank_a_index):
         for index, track_index in enumerate(self.loop_tracks[:8]):
@@ -70,7 +68,7 @@ class TrackProcessor():
             if self.manager.song.tracks[track_index].clip_slots[bank_a_index].clip != None:
                 clip_name = self.manager.song.tracks[track_index].clip_slots[bank_a_index].clip.name
             clip_name_bytes = clip_name.encode('ascii', errors='ignore')
-            sysex_message = bytes([26, index]) + clip_name_bytes
+            sysex_message = bytes([SYSEX_PREFIX.LOOP_NAMES, index]) + clip_name_bytes
             self.manager.send_sysex(sysex_message)
 
     def sendBankBNames(self, bank_b_index):
@@ -79,7 +77,7 @@ class TrackProcessor():
             if bank_b_index < len(self.manager.song.tracks[track_index].clip_slots) and self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip != None:
                 clip_name = self.manager.song.tracks[track_index].clip_slots[bank_b_index].clip.name
             clip_name_bytes = clip_name.encode('ascii', errors='ignore')
-            sysex_message = bytes([26, index + BANK_B_OFFSET]) + clip_name_bytes
+            sysex_message = bytes([SYSEX_PREFIX.LOOP_NAMES, index + BANK_B_OFFSET]) + clip_name_bytes
             self.manager.send_sysex(sysex_message)
 
     def disconnect(self):
