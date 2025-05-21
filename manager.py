@@ -33,6 +33,8 @@ class Manager(ControlSurface):
         self.bankATempoIndex = -1
         self.currentBankAIndex = -1
         self.currentBankBIndex = -1
+        self.tide_a_index = -1
+        self.tide_pgm_index = -1
         self.loopFadeStates = LOOP_FADE_STATES
         self.fadeLoops = False
         self.fadeSpeed = 0.01
@@ -55,6 +57,7 @@ class Manager(ControlSurface):
         self.track_processor.manager = self
         self.track_processor.logger = logger
         self.track_processor.processTracks(self.song.tracks)
+        self.track_processor.processReturnTracks(self.song.return_tracks)
 
     def timerFadeCallback(self):
         should_stop_timer = True
@@ -271,6 +274,9 @@ class Manager(ControlSurface):
             elif cc_num == Channel_1_CC.BANK_B_SELECT:
                 handled = True
                 self.track_processor.setBankBLoops(value)
+            elif cc_num == Channel_1_CC.TIDE_A_PGM:
+                handled = True
+                self.track_processor.setTidePGM(value)
             elif cc_num == Channel_1_CC.LOAD_PRESET:
                 handled = True
                 self.preset_mananger.load_preset_into_set(value)

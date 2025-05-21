@@ -29,6 +29,17 @@ class TrackProcessor():
                         self.track_listeners.append((track, listener))  # Store for cleanup
                     continue
 
+    def processReturnTracks(self, return_tracks: List[Live.Track.Track]):
+        for index, track in enumerate(return_tracks):
+            if track.name == "A-TIDEa":
+                self.manager.tide_a_index = index
+                for param_index, parameter in enumerate(track.devices[0].parameters):
+                    if parameter.name == "tidepgm":
+                        self.manager.tide_pgm_index = param_index
+
+    def setTidePGM(self, value):
+        self.manager.song.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_pgm_index].value = value
+
     def _on_playing_slot_index_changed(self, track, loop_index):
         loop_state = LOOP_STATE.STOPPED
         slot_index = track.playing_slot_index

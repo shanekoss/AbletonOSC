@@ -2,7 +2,7 @@ import json
 import os
 from collections import OrderedDict
 from pathlib import Path
-from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE, CHAINS_TO_IGNORE_TRANSPOSE, LOOPTRACK_NAMES
+from .abletonosc.constants import PRESET_INCLUDE_TRACKS, MIDI_TRANSPOSER_DEVICE, PARAMS_TO_CACHE, CHAINS_TO_IGNORE_TRANSPOSE, LOOPTRACK_NAMES, RETURN_TRACKS
 
 import logging
 
@@ -160,6 +160,18 @@ class PresetManager:
             track_data = self._extract_track_data(track)
             if track_data != None:
                 data['tracks'].append(track_data)
+        # Returns
+        data['returns'] = []
+        for return_track in live_set.return_tracks:
+            return_track_data = self._extract_return_track_data(return_track)
+            if track_data != None:
+                data['returns'].append(return_track_data)
+        
+        master_track_data = OrderedDict()
+        master_track_data['name'] = live_set.master_track.name
+        master_track_data['volume'] = live_set.master_track.mixer_device.volume.value
+        data['master'] = master_track_data
+
         return data
     
     def _extract_track_data(self, track):
@@ -233,6 +245,25 @@ class PresetManager:
         else:
             return None
     
+    def _extract_return_track_data(self, return_track):
+        if return_track.name in RETURN_TRACKS:
+            return_track_data = OrderedDict()
+            return_track_data['name'] = return_track.name
+            return_track_data['mute'] = return_track.mute
+            return_track_data['volume'] = return_track.mixer_device.volume.value
+            return_track_data['sends'] = []
+            for index, send in enumerate(return_track.mixer_device.sends):
+                param_data = {
+                    'name': send.name,
+                    'value': send.value,
+                    'index': index,
+                }
+                return_track_data['sends'].append(param_data)
+            return_track_data['panning'] = return_track.mixer_device.panning.value
+            return return_track_data
+        else:
+            return None
+
     def _extract_device_data(self, device, device_name = None):
         """Extract data from a device."""
         device_data = OrderedDict()
@@ -299,9 +330,17 @@ class PresetManager:
             if found_track_data is not None:
                 self._apply_track_data(track, found_track_data)
 
+        for return_track in live_set.return_tracks:
+            found_return_track_data = next((ret for ret in preset_data.get('returns', []) if ret.get("name") == return_track.name), None)
+            if found_track_data is not None:
+                self._apply_return_track_data(return_track, found_return_track_data)   
+            
         # set loop banks
         self.manager.track_processor.setBankALoops(preset_data['BankA'], True)
         self.manager.track_processor.setBankBLoops(preset_data['BankB'], True)
+
+        # master track
+        live_set.master_track.mixer_device.volume.value = preset_data['master']['volume']
 
         # autostart loops
         for loop_index, should_start in enumerate(self.loop_autostart):
@@ -383,6 +422,16 @@ class PresetManager:
             else:
                 self.logger.warrning(f"No integer found in name {track.name}")
     
+    def _apply_return_track_data(self, return_track, return_track_data):
+        return_track.mute = return_track_data.get('mute', return_track.mute)
+        return_track.solo = return_track_data.get('solo', return_track.solo)
+        return_track.mixer_device.volume.value = return_track_data.get('volume', return_track.mixer_device.volume.value)
+        return_track.mixer_device.panning.value = return_track_data.get('panning', return_track.mixer_device.panning.value)
+        for send in return_track_data['sends']:
+            if return_track.mixer_device.sends[send['index']].name != send['name']:
+                self.logger.warning(f"Expecting send {return_track.mixer_device.sends[send['index']]} but found {return_track.mixer_device.sends[send['index']].name}!!!")
+            return_track.mixer_device.sends[send['index']].value = send['value']
+
     def _apply_device_data(self, device, device_data):
         """Apply data to a device."""
         # In a real implementation, you'd need to handle device creation/matching

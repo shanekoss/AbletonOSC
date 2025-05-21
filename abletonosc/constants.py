@@ -106,6 +106,18 @@ PRESET_INCLUDE_TRACKS = {
     "Tide/FX Stereo": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False}
 }
 
+RETURN_TRACKS = [
+    "A-TIDEa",
+    "B-PORTAL",
+    "C-toLOOPER",
+    "D-STEREO",
+    "E-LOOPS",
+    "F-KEYS",
+    "G-VOCAL",
+    "H-BASS",
+    "I-to INSTA"
+]
+
 PARAMS_TO_CACHE = {
     MIDI_TRANSPOSER_DEVICE: ["program", "transpose"],
 }
@@ -135,6 +147,7 @@ class Channel_1_Note(IntEnum):
 class Channel_1_CC(IntEnum):
     BANK_A_SELECT = 16
     BANK_B_SELECT = 17
+    TIDE_A_PGM = 18
     LOAD_PRESET = 19
     SAVE_PRESET = 20
     LOOP_FADE = 21
@@ -155,6 +168,7 @@ class SYSEX_PREFIX(IntEnum):
 CC_LISTENERS = [
     [Channel_1_CC.BANK_A_SELECT, 0],
     [Channel_1_CC.BANK_B_SELECT, 0],
+    [Channel_1_CC.TIDE_A_PGM, 0],
     [Channel_1_CC.LOAD_PRESET, 0],
     [Channel_1_CC.SAVE_PRESET, 0],
     [Channel_1_CC.LOOP_FADE, 0],
