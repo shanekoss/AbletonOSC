@@ -62,6 +62,20 @@ class PresetManager:
             preset_data['BankA'] = self.manager.currentBankAIndex
             preset_data['BankB'] = self.manager.currentBankBIndex
 
+            #tide pgm
+            preset_data['tideAPGM'] = live_set.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_pgm_index].value
+
+            #portal/movement settings =
+            portal_fx_data = OrderedDict()
+            portal_fx_data['MvmtY'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_y_index].value
+            portal_fx_data['MvmtX'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_x_index].value
+            portal_fx_data['MvmtWetDry'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_wet_dry_index].value
+            portal_fx_data['Portal1'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_1_index].value
+            portal_fx_data['Portal2'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_2_index].value
+            portal_fx_data['PortalRev'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_reverse_index].value
+            portal_fx_data['PortalWetDry'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_wet_dry_index].value
+            preset_data['portal_fx'] = portal_fx_data
+
             # Initialize presets array
             presets = []
             
@@ -338,6 +352,18 @@ class PresetManager:
         # set loop banks
         self.manager.track_processor.setBankALoops(preset_data['BankA'], True)
         self.manager.track_processor.setBankBLoops(preset_data['BankB'], True)
+
+        #tide pgm
+        live_set.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_pgm_index].value = preset_data['tideAPGM']
+
+        #portal fx
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_y_index].value = preset_data['portal_fx']['MvmtY']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_x_index].value = preset_data['portal_fx']['MvmtX']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_wet_dry_index].value = preset_data['portal_fx']['MvmtWetDry']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_1_index].value = preset_data['portal_fx']['Portal1']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_2_index].value = preset_data['portal_fx']['Portal2']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_reverse_index].value = preset_data['portal_fx']['PortalRev']
+        live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.portal_wet_dry_index].value = preset_data['portal_fx']['PortalWetDry']
 
         # master track
         live_set.master_track.mixer_device.volume.value = preset_data['master']['volume']

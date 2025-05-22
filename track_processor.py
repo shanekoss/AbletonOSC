@@ -36,9 +36,25 @@ class TrackProcessor():
                 for param_index, parameter in enumerate(track.devices[0].parameters):
                     if parameter.name == "tidepgm":
                         self.manager.tide_pgm_index = param_index
-
-    def setTidePGM(self, value):
-        self.manager.song.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_pgm_index].value = value
+            elif track.name == "B-PORTAL":
+                self.manager.portal_index = index
+                # self.logger.info(f"Current variation: {track.devices[0].selected_variation_index}")
+                # track.devices[0].selected_variation_index = track.devices[0].selected_variation_index + 1
+                for param_index, parameter in enumerate(track.devices[0].parameters):
+                    if parameter.name == "Mvmt Y":
+                        self.manager.movement_y_index = param_index
+                    elif parameter.name == "Mvmt X":
+                        self.manager.movement_x_index = param_index
+                    elif parameter.name == "Mvmt Wet/Dry":
+                        self.manager.movement_wet_dry_index = param_index
+                    elif parameter.name == "Portal Macro1":
+                        self.manager.portal_1_index = param_index
+                    elif parameter.name == "Portal Macro2":
+                        self.manager.portal_2_index = param_index
+                    elif parameter.name == "Portal Reverse":
+                        self.manager.portal_reverse_index = param_index
+                    elif parameter.name == "Portal Wet/Dry":
+                        self.manager.portal_wet_dry_index = param_index
 
     def _on_playing_slot_index_changed(self, track, loop_index):
         loop_state = LOOP_STATE.STOPPED

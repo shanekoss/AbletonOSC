@@ -35,6 +35,15 @@ class Manager(ControlSurface):
         self.currentBankBIndex = -1
         self.tide_a_index = -1
         self.tide_pgm_index = -1
+        self.portal_index = -1
+        self.movement_y_index = -1
+        self.movement_x_index = -1
+        self.movement_wet_dry_index = -1
+        self.portal_1_index = -1
+        self.portal_2_index = -1
+        self.portal_reverse_index = -1
+        self.portal_wet_dry_index = -1
+        
         self.loopFadeStates = LOOP_FADE_STATES
         self.fadeLoops = False
         self.fadeSpeed = 0.01
@@ -274,9 +283,6 @@ class Manager(ControlSurface):
             elif cc_num == Channel_1_CC.BANK_B_SELECT:
                 handled = True
                 self.track_processor.setBankBLoops(value)
-            elif cc_num == Channel_1_CC.TIDE_A_PGM:
-                handled = True
-                self.track_processor.setTidePGM(value)
             elif cc_num == Channel_1_CC.LOAD_PRESET:
                 handled = True
                 self.preset_mananger.load_preset_into_set(value)

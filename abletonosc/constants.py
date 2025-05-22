@@ -147,7 +147,6 @@ class Channel_1_Note(IntEnum):
 class Channel_1_CC(IntEnum):
     BANK_A_SELECT = 16
     BANK_B_SELECT = 17
-    TIDE_A_PGM = 18
     LOAD_PRESET = 19
     SAVE_PRESET = 20
     LOOP_FADE = 21
@@ -168,7 +167,6 @@ class SYSEX_PREFIX(IntEnum):
 CC_LISTENERS = [
     [Channel_1_CC.BANK_A_SELECT, 0],
     [Channel_1_CC.BANK_B_SELECT, 0],
-    [Channel_1_CC.TIDE_A_PGM, 0],
     [Channel_1_CC.LOAD_PRESET, 0],
     [Channel_1_CC.SAVE_PRESET, 0],
     [Channel_1_CC.LOOP_FADE, 0],
