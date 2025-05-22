@@ -67,6 +67,7 @@ class PresetManager:
 
             #portal/movement settings =
             portal_fx_data = OrderedDict()
+            portal_fx_data['variation'] = live_set.return_tracks[self.manager.portal_index].devices[0].selected_variation_index
             portal_fx_data['MvmtY'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_y_index].value
             portal_fx_data['MvmtX'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_x_index].value
             portal_fx_data['MvmtWetDry'] = live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_wet_dry_index].value
@@ -357,6 +358,8 @@ class PresetManager:
         live_set.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_pgm_index].value = preset_data['tideAPGM']
 
         #portal fx
+        live_set.return_tracks[self.manager.portal_index].devices[0].selected_variation_index = preset_data['portal_fx']['variation']
+        live_set.return_tracks[self.manager.portal_index].devices[0].recall_selected_variation()
         live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_y_index].value = preset_data['portal_fx']['MvmtY']
         live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_x_index].value = preset_data['portal_fx']['MvmtX']
         live_set.return_tracks[self.manager.portal_index].devices[0].parameters[self.manager.movement_wet_dry_index].value = preset_data['portal_fx']['MvmtWetDry']
