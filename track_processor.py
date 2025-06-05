@@ -11,6 +11,32 @@ class TrackProcessor():
         self.manager = None
         self.logger = None
         self.track_listeners = []
+        self.param_listeners = []
+
+    def print_browser_children(self):
+        # Get the Live application instance
+        app = Live.Application.get_application()
+        
+        # Get the current project
+        project = app.browser.current_project
+        
+        # Print the name of the current project
+        self.logger.info(f"Current Project: {project.name}")
+        
+        # Iterate through the children
+        self.logger.info("Children of current project:")
+        self.logger.info(len(project.children))
+        for child in project.children:
+            self.logger.info("I have a kid!")
+            self.logger.info(dir(child))
+            self.logger.info(child.name)
+            # If you want to go deeper into the hierarchy:
+            if hasattr(child, 'children'):
+                for subchild in child.children:
+                    self.logger.info(subchild.name)
+                    if subchild.name == "sn 2 hard.dup6_01.adv":
+                        app.browser.load_item(subchild)
+
     def processTracks(self, tracks: List[Live.Track.Track]):
         for index, track in enumerate(tracks):
             if track.name == BANK_A_TEMPO:
@@ -36,6 +62,11 @@ class TrackProcessor():
                 for param_index, parameter in enumerate(track.devices[0].parameters):
                     if parameter.name == "tidepgm":
                         self.manager.tide_pgm_index = param_index
+                    if parameter.name == "tidePresetName":
+                        self.manager.tide_preset_name_index = param_index
+                        listener = lambda: self._on_tide_name_changed()
+                        parameter.add_value_listener(listener)
+                        self.param_listeners.append((parameter, listener))
             elif track.name == "B-PORTAL":
                 self.manager.portal_index = index
                 # self.logger.info(f"Current variation: {track.devices[0].selected_variation_index}")
@@ -55,6 +86,14 @@ class TrackProcessor():
                         self.manager.portal_reverse_index = param_index
                     elif parameter.name == "Portal Wet/Dry":
                         self.manager.portal_wet_dry_index = param_index
+                # current_project_children = Live.Browser.Browser.current_project
+                # for param_index, child in enumerate(current_project_children):
+                #     self.logger.info(child.name)
+                # self.logger.info("looking!")
+                # self.logger.info(f"found {dir(track.devices[0].chains[0].devices[2].view)}")
+                # for param_index, parameter in enumerate(track.devices[0].chains[0].devices[2].parameters):
+                #     if parameter.name == "textedit":
+                #         self.logger.info("FUCKING FOUND IT!")
 
     def _on_playing_slot_index_changed(self, track, loop_index):
         loop_state = LOOP_STATE.STOPPED
@@ -63,6 +102,12 @@ class TrackProcessor():
             #TODO: do we want to verify slot_index matches the loop bank expected?
             loop_state = LOOP_STATE.PLAYING
         self.manager.send_midi_note(0, loop_index, loop_state)
+
+    def _on_tide_name_changed(self):
+        tide_name = self.manager.song.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_preset_name_index].value_items[0]
+        tide_name_bytes = tide_name.encode('ascii', errors='ignore')
+        sysex_message = bytes([SYSEX_PREFIX.TIDE_NAME]) + tide_name_bytes
+        self.manager.send_sysex(sysex_message)
 
     def setBankALoops(self, new_bank_a_index, should_send_midi = False):
         for loop_track_index in range(1, 9):
@@ -113,3 +158,8 @@ class TrackProcessor():
             if track.playing_slot_index_has_listener(listener):
                 track.remove_playing_slot_index_listener(listener)
         self.track_listeners = []  # Clear the list
+
+        for param, listener in self.param_listeners:
+            if param.value_has_listener(listener):
+                param.remove_value_listener(listener)
+        self.param_listeners = []  # Clear the list

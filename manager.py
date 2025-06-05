@@ -67,6 +67,7 @@ class Manager(ControlSurface):
         self.track_processor.logger = logger
         self.track_processor.processTracks(self.song.tracks)
         self.track_processor.processReturnTracks(self.song.return_tracks)
+        self.schedule_message(1, self.track_processor.print_browser_children)
 
     def timerFadeCallback(self):
         should_stop_timer = True
