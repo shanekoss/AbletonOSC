@@ -162,7 +162,7 @@ class LOOP_STATE(IntEnum):
 
 class SYSEX_PREFIX(IntEnum):
     LOOP_NAMES = 26
-
+    TIDE_NAME = 23
 
 CC_LISTENERS = [
     [Channel_1_CC.BANK_A_SELECT, 0],

@@ -13,29 +13,25 @@ class TrackProcessor():
         self.track_listeners = []
         self.param_listeners = []
 
-    def print_browser_children(self):
-        # Get the Live application instance
+    def get_portal_presets(self):
         app = Live.Application.get_application()
-        
-        # Get the current project
         project = app.browser.current_project
         
-        # Print the name of the current project
-        self.logger.info(f"Current Project: {project.name}")
-        
-        # Iterate through the children
-        self.logger.info("Children of current project:")
-        self.logger.info(len(project.children))
         for child in project.children:
-            self.logger.info("I have a kid!")
-            self.logger.info(dir(child))
-            self.logger.info(child.name)
-            # If you want to go deeper into the hierarchy:
-            if hasattr(child, 'children'):
+            if child.name == "Presets":
                 for subchild in child.children:
-                    self.logger.info(subchild.name)
-                    if subchild.name == "sn 2 hard.dup6_01.adv":
-                        app.browser.load_item(subchild)
+                    if subchild.name == "PortalFX":
+                        for preset in subchild.children:
+                            self.logger.info(f"Preset found: {preset.name}")
+                        return
+        
+        self.logger.error("PortalFX folder was not found!!")
+            # # If you want to go deeper into the hierarchy:
+            # if hasattr(child, 'children'):
+            #     for subchild in child.children:
+            #         self.logger.info(subchild.name)
+            #         if subchild.name == "sn 2 hard.dup6_01.adv":
+            #             app.browser.load_item(subchild)
 
     def processTracks(self, tracks: List[Live.Track.Track]):
         for index, track in enumerate(tracks):
