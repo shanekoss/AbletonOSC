@@ -5,7 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_5_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL, STATE
 from .timer import Timer
 import importlib
 import traceback
@@ -31,6 +31,7 @@ class Manager(ControlSurface):
         self._sysex_listeners = []
 
         self.bankATempoIndex = -1
+        self.state_index = -1
         self.currentBankAIndex = -1
         self.currentBankBIndex = -1
         self.tide_a_index = -1
@@ -44,7 +45,7 @@ class Manager(ControlSurface):
         self.portal_reverse_index = -1
         self.portal_wet_dry_index = -1
         self.portal_name_index = -1
-        
+
         self.loopFadeStates = LOOP_FADE_STATES
         self.fadeLoops = False
         self.fadeSpeed = 0.01
@@ -299,6 +300,12 @@ class Manager(ControlSurface):
             elif cc_num == Channel_1_CC.LOOP_FADE_SPEED:
                 self.fadeSpeed =  max(0.01, min(1 - (value / 127.0), 1.0))   
                 handled = True
+        elif channel == 4:
+            #TODO: left off here - we don't need this anymore - it is mapped
+            if cc_num == Channel_5_CC.STEREO_SPLIT_DANTE:
+                self.song.tracks[self.state_index].devices[0].parameters[STATE.SPLITS].value = value
+                handled = True
+                
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
     

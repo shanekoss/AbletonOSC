@@ -75,7 +75,7 @@ PRESET_INCLUDE_TRACKS = {
     "FootLoop6": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "FootLoop7": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "FootLoop8": {"observeVolume": True, "observeMute": True, "observeSends": True, "hasPGM": False, "hasTransp": False, "hasChains": False},
-    # "MAX": {"observeVolume": False, "observeMute": False, "observeSends": False, "hasPGM": False, "hasTransp": False, "hasChains": False},
+    "STATE": {"observeVolume": False, "observeMute": False, "observeSends": False, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "IpadInput1": {"observeVolume": True, "observeMute": True, "observeSends": False, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "IpadInput2": {"observeVolume": True, "observeMute": True, "observeSends": False, "hasPGM": False, "hasTransp": False, "hasChains": False},
     "IpadInput3": {"observeVolume": True, "observeMute": True, "observeSends": False, "hasPGM": False, "hasTransp": False, "hasChains": False},
@@ -144,6 +144,9 @@ class Channel_1_Note(IntEnum):
     LOOP15 = 14
     LOOP16 = 15
 
+class STATE(IntEnum):
+    SPLITS = 1
+    
 class Channel_1_CC(IntEnum):
     BANK_A_SELECT = 16
     BANK_B_SELECT = 17
@@ -151,6 +154,9 @@ class Channel_1_CC(IntEnum):
     SAVE_PRESET = 20
     LOOP_FADE = 21
     LOOP_FADE_SPEED = 22
+
+class Channel_5_CC(IntEnum):
+    STEREO_SPLIT_DANTE = 0
 
 class LOOP_VELOCITY(IntEnum):
     STOP_LOOP = 1
@@ -172,6 +178,7 @@ CC_LISTENERS = [
     [Channel_1_CC.SAVE_PRESET, 0],
     [Channel_1_CC.LOOP_FADE, 0],
     [Channel_1_CC.LOOP_FADE_SPEED, 0],
+    [Channel_5_CC.STEREO_SPLIT_DANTE, 4]
 ]
 
 NOTE_LISTENERS = [

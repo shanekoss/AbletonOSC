@@ -38,7 +38,12 @@ class TrackProcessor():
             if track.name == BANK_A_TEMPO:
                 self.manager.bankATempoIndex = index
                 continue
-            if track.name in LOOPTRACK_NAMES:
+            elif track.name == "STATE":
+                self.manager.state_index = index
+                for param in self.manager.song.tracks[self.manager.state_index].devices[0].parameters:
+                    self.logger.info(param.name)
+                continue
+            elif track.name in LOOPTRACK_NAMES:
                 loop_index = LOOPTRACK_NAMES.index(track.name)
                 if loop_index != -1:
                     if loop_index >= len(self.loop_tracks):
@@ -67,6 +72,7 @@ class TrackProcessor():
                 self.manager.portal_index = index
                 # self.logger.info(f"Current variation: {track.devices[0].selected_variation_index}")
                 # track.devices[0].selected_variation_index = track.devices[0].selected_variation_index + 1
+                self.logger.info(dir(track.devices[0]));
                 for param_index, parameter in enumerate(track.devices[0].parameters):
                     if parameter.name == "Mvmt Y":
                         self.manager.movement_y_index = param_index
@@ -88,11 +94,16 @@ class TrackProcessor():
                 # self.logger.info("looking!")
                 # self.logger.info(f"found {dir(track.devices[0].chains[0].devices[2].view)}")
                 for param_index, parameter in enumerate(track.devices[0].chains[0].devices[2].parameters):
+                    if parameter.name == "portalPGM":
+                        a = 1
+                        # listener = lambda: self._on_portal_name_changed()
+                        # parameter.add_value_listener(listener)
+                        # self.param_listeners.append((parameter, listener))
                     if parameter.name == "portalName":
                         self.manager.portal_name_index = param_index
-                        listener = lambda: self._on_portal_name_changed()
-                        parameter.add_value_listener(listener)
-                        self.param_listeners.append((parameter, listener))
+                        # listener = lambda: self._on_portal_name_changed()
+                        # parameter.add_value_listener(listener)
+                        # self.param_listeners.append((parameter, listener))
 
     def _on_playing_slot_index_changed(self, track, loop_index):
         loop_state = LOOP_STATE.STOPPED
