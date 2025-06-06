@@ -87,9 +87,12 @@ class TrackProcessor():
                 #     self.logger.info(child.name)
                 # self.logger.info("looking!")
                 # self.logger.info(f"found {dir(track.devices[0].chains[0].devices[2].view)}")
-                # for param_index, parameter in enumerate(track.devices[0].chains[0].devices[2].parameters):
-                #     if parameter.name == "textedit":
-                #         self.logger.info("FUCKING FOUND IT!")
+                for param_index, parameter in enumerate(track.devices[0].chains[0].devices[2].parameters):
+                    if parameter.name == "portalName":
+                        self.manager.portal_name_index = param_index
+                        listener = lambda: self._on_portal_name_changed()
+                        parameter.add_value_listener(listener)
+                        self.param_listeners.append((parameter, listener))
 
     def _on_playing_slot_index_changed(self, track, loop_index):
         loop_state = LOOP_STATE.STOPPED
@@ -98,6 +101,12 @@ class TrackProcessor():
             #TODO: do we want to verify slot_index matches the loop bank expected?
             loop_state = LOOP_STATE.PLAYING
         self.manager.send_midi_note(0, loop_index, loop_state)
+
+    def _on_portal_name_changed(self):
+        portal_name = self.manager.song.return_tracks[self.manager.portal_index].devices[0].chains[0].devices[2].parameters[self.manager.portal_name_index].value_items[0]
+        portal_name_bytes = portal_name.encode('ascii', errors='ignore')
+        sysex_message = bytes([SYSEX_PREFIX.PORTAL_NAME]) + portal_name_bytes
+        self.manager.send_sysex(sysex_message)
 
     def _on_tide_name_changed(self):
         tide_name = self.manager.song.return_tracks[self.manager.tide_a_index].devices[0].parameters[self.manager.tide_preset_name_index].value_items[0]

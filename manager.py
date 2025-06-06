@@ -43,6 +43,7 @@ class Manager(ControlSurface):
         self.portal_2_index = -1
         self.portal_reverse_index = -1
         self.portal_wet_dry_index = -1
+        self.portal_name_index = -1
         
         self.loopFadeStates = LOOP_FADE_STATES
         self.fadeLoops = False
