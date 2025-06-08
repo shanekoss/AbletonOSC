@@ -5,7 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_5_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL, STATE
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL, STATE
 from .timer import Timer
 import importlib
 import traceback
@@ -300,12 +300,7 @@ class Manager(ControlSurface):
             elif cc_num == Channel_1_CC.LOOP_FADE_SPEED:
                 self.fadeSpeed =  max(0.01, min(1 - (value / 127.0), 1.0))   
                 handled = True
-        elif channel == 4:
-            #TODO: left off here - we don't need this anymore - it is mapped
-            if cc_num == Channel_5_CC.STEREO_SPLIT_DANTE:
-                self.song.tracks[self.state_index].devices[0].parameters[STATE.SPLITS].value = value
-                handled = True
-                
+
         if handled == False:
             logger.info(f"Unhandled CC CH{channel:02d} #{cc_num:03d} = {value:03d}")
     
@@ -353,6 +348,25 @@ class Manager(ControlSurface):
     def set_track_volume(self, data):
         self.song.tracks[data['index']].mixer_device.volume.value = data['value']
 
+    def set_track_send(self, data):
+        if data['is_return'] == True:
+            self.song.return_tracks[data['index']].mixer_device.sends[data['send_index']].value = data['value']
+        else:
+            self.song.tracks[data['index']].mixer_device.sends[data['send_index']].value = data['value']
+
+    def set_output_routing_type(self, data):
+        if data['is_return'] == True:
+            self.song.return_tracks[data['index']].output_routing_type = data['output_routing_type']
+        else:
+            self.song.tracks[data['index']].output_routing_type = data['output_routing_type']
+
+    def set_output_routing_channel(self, data):
+        if data['is_return'] == True:
+            self.song.return_tracks[data['index']].output_routing_channel = data['output_routing_channel']
+        else:
+            self.song.tracks[data['index']].output_routing_channel = data['output_routing_channel']
+        
+        
     def stop_loops_on_track(self, track_index):
         self.song.tracks[track_index].stop_all_clips(False)
 

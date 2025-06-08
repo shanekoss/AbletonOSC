@@ -115,23 +115,23 @@ class PresetManager:
         """
         try:
             if not os.path.exists(self.preset_path):
-                self.logger.error("Preset file not found")
+                self.logger.error("Preset file not found: BAD")
                 return False
                 
             with open(self.preset_path, 'r') as f:
                 try:
                     presets = json.load(f, object_pairs_hook=OrderedDict)
                     if not isinstance(presets, list):
-                        self.logger.error("Preset file is corrupted - not an array")
+                        self.logger.error("Preset file is corrupted: not an array")
                         return False
                         
                     if preset_index >= len(presets):
-                        self.logger.error(f"Preset index {preset_index} does not exist!")
+                        self.logger.error(f"Preset index {preset_index} does not exist: BAD!")
                         return False
                     
                     preset_data = presets[preset_index]
                     if preset_data is None:
-                        self.logger.error(f"No preset exists at index {preset_index}!")
+                        self.logger.error(f"No preset exists at index {preset_index}: BAD!")
                         return False
                     
                     live_set = self._c_instance.song()
@@ -139,7 +139,7 @@ class PresetManager:
                     
                     return True
                 except json.JSONDecodeError:
-                    self.logger.error("Preset file is corrupted - invalid JSON")
+                    self.logger.error("Preset file is corrupted: invalid JSON")
                     return False
         except Exception as e:
             self.logger.error(f"Error loading preset: {str(e)}")
