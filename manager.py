@@ -5,7 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, STATE
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, STATE, MIDI_ECHO
 import importlib
 import traceback
 import logging
@@ -280,6 +280,9 @@ class Manager(ControlSurface):
                 elif velocity == LOOP_VELOCITY.START_LOOP:
                     handled = True
                     self.start_loop(note)
+            elif note == MIDI_ECHO:
+                handled = True
+                self.send_midi_note(0, 127, 1)
         if handled == False:
             logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")
     
