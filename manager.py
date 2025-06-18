@@ -5,7 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, STATE, MIDI_ECHO
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, STATE, MIDI_ECHO, STOP
 import importlib
 import traceback
 import logging
@@ -43,6 +43,7 @@ class Manager(ControlSurface):
         self.portal_reverse_index = -1
         self.portal_wet_dry_index = -1
         self.portal_name_index = -1
+        self.previous_beat = -1
 
         self.loopFadeStates = LOOP_FADE_STATES
         self.fadeLoops = False
@@ -68,7 +69,15 @@ class Manager(ControlSurface):
         self.track_processor.processTracks(self.song.tracks)
         self.track_processor.processReturnTracks(self.song.return_tracks)
         self.schedule_message(1, self.track_processor.get_portal_presets)
-             
+        self.song.add_current_song_time_listener(self.on_song_time_changed)
+
+    def on_song_time_changed(self):
+        """Callback function that gets called when song time changes"""
+        current_song_time = self.song.get_current_beats_song_time()
+        if self.previous_beat is not current_song_time.beats:
+            self.previous_beat = current_song_time.beats
+            self.send_midi_cc(0, 127, current_song_time.beats)
+
     def handle_volume_cc(self, value):
         logger.info(f"Volume CC changed to {value}")
 
@@ -283,6 +292,10 @@ class Manager(ControlSurface):
             elif note == MIDI_ECHO:
                 handled = True
                 self.send_midi_note(0, 127, 1)
+            elif note == STOP and velocity is 1:
+                handled = True
+                self.song.stop_playing()
+                self.song.stop_all_clips()
         if handled == False:
             logger.info(f"Unhandled Note CH{channel:02d} #{note:03d} = {velocity:03d}")
     
@@ -408,6 +421,8 @@ class Manager(ControlSurface):
 
     def disconnect(self):
         logger.info("Disconnecting...")
+        if self.song.current_song_time_has_listener(self.on_song_time_changed):
+            self.song.remove_current_song_time_listener(self.on_song_time_changed)
         self.stop_logging()
         self.osc_server.shutdown()
         super().disconnect()

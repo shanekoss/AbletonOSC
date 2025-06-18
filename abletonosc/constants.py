@@ -11,6 +11,7 @@ BANK_B_OFFSET = 8
 FADE_AMOUNT = 0.05
 FADER_ZERO = 0.85
 MIDI_ECHO = 127
+STOP = 20
 BANK_A_TEMPO = "BANKaTEMPO"
 LOOPTRACK_NAMES = [
     "LOOP1",
@@ -134,7 +135,8 @@ NOTE_LISTENERS = [
     [Channel_1_Note.LOOP14, 0],
     [Channel_1_Note.LOOP15, 0],
     [Channel_1_Note.LOOP16, 0],
-    [MIDI_ECHO, 0] 
+    [MIDI_ECHO, 0], 
+    [STOP, 0] 
 ]
 
 class LOOP_FADE_STATE(IntEnum): 
