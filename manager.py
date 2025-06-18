@@ -5,8 +5,7 @@ from ableton.v2.control_surface import MIDI_CC_TYPE, MIDI_PB_TYPE, MIDI_NOTE_TYP
 from . import abletonosc
 from .track_processor import TrackProcessor
 from .preset_manager import PresetManager
-from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, FADER_TIMER_INTERVAL, STATE
-from .timer import Timer
+from .abletonosc.constants import CC_LISTENERS, NOTE_LISTENERS, Channel_1_CC, Channel_1_Note, LOOP_VELOCITY, LOOP_FADE_STATES, LOOP_FADE_STATE, FADE_AMOUNT, FADER_ZERO, STATE
 import importlib
 import traceback
 import logging
@@ -21,7 +20,6 @@ class Manager(ControlSurface):
     def __init__(self, c_instance):
         ControlSurface.__init__(self, c_instance)
         self._c_instance = c_instance
-        self.fade_timer = Timer(FADER_TIMER_INTERVAL, self.timerFadeCallback)
         self.log_level = "info"
 
         # MIDI Handling Setup
@@ -70,39 +68,7 @@ class Manager(ControlSurface):
         self.track_processor.processTracks(self.song.tracks)
         self.track_processor.processReturnTracks(self.song.return_tracks)
         self.schedule_message(1, self.track_processor.get_portal_presets)
-
-    def timerFadeCallback(self):
-        should_stop_timer = True
-        for loop_index, (loop_name, loop_state) in enumerate(self.loopFadeStates.items()):
-            track_index = self.bankATempoIndex + loop_index + 1
-            if loop_index > 7:
-                #offset for bank b track
-                track_index = track_index + 1
-            current_volume = self.song.tracks[track_index].mixer_device.volume.value
-            if loop_state["state"] == LOOP_FADE_STATE.FADING_IN:
-                current_volume = current_volume + self.fadeSpeed * FADE_AMOUNT
-                if current_volume > FADER_ZERO:
-                    current_volume = FADER_ZERO
-                if current_volume == FADER_ZERO:
-                    loop_state["state"] = LOOP_FADE_STATE.FULL_VOLUME
-                else:
-                    should_stop_timer = False
-                self.schedule_message(1, self.set_track_volume, {"index": track_index, "value": current_volume})
-            elif loop_state["state"] == LOOP_FADE_STATE.FADING_OUT:
-                current_volume = current_volume - self.fadeSpeed * FADE_AMOUNT
-                if current_volume < 0:
-                    current_volume = 0
-                if current_volume == 0:
-                    loop_state["state"] = LOOP_FADE_STATE.VOLUME_ALL_DOWN
-                    self.schedule_message(1, self.stop_loops_on_track, track_index)
-                else:
-                    should_stop_timer = False
-                self.schedule_message(1, self.set_track_volume, {"index": track_index, "value": current_volume})
-        
-        #Stop timer if no loop is fading
-        return should_stop_timer
-        
-        
+             
     def handle_volume_cc(self, value):
         logger.info(f"Volume CC changed to {value}")
 
@@ -324,24 +290,53 @@ class Manager(ControlSurface):
         if is_bank_a == False:
             #offset for bank b
             track_index + track_index + 1
+        loop_state_name = f'LOOP{note + 1}'
         if self.song.tracks[track_index].clip_slots[clip_slot_index].has_clip:
             if self.fadeLoops:
                 if math.isclose(self.song.tracks[track_index].mixer_device.volume.value, FADER_ZERO, rel_tol=1e-3):
                     self.song.tracks[track_index].mixer_device.volume.value = 0
-                self.loopFadeStates[f'LOOP{note + 1}']['state'] = LOOP_FADE_STATE.FADING_IN
-                if self.fade_timer.is_running() == False:
-                    self.fade_timer.start()
+                self.loopFadeStates[loop_state_name]['state'] = LOOP_FADE_STATE.FADING_IN
+                self.fadeLoop({"track_index": track_index, "loop_state_name": loop_state_name})
             else:
                 self.song.tracks[track_index].mixer_device.volume.value = FADER_ZERO
             self.song.tracks[track_index].clip_slots[clip_slot_index].clip.fire()
         else:
             logger.warning(f"Clip slot {clip_slot_index} for Loop{note+1} has no clip!")
 
+    def fadeLoop(self, data):
+        track_index = data['track_index']
+        loop_state_name = data['loop_state_name']
+        current_volume = self.song.tracks[track_index].mixer_device.volume.value
+        if self.loopFadeStates[loop_state_name]['state'] == LOOP_FADE_STATE.FADING_IN:
+            current_volume = current_volume + self.fadeSpeed * FADE_AMOUNT
+            if current_volume > FADER_ZERO:
+                current_volume = FADER_ZERO
+            if current_volume == FADER_ZERO:
+                self.loopFadeStates[loop_state_name]['state'] = LOOP_FADE_STATE.FULL_VOLUME
+            else:
+                self.schedule_message(1, self.fadeLoop, {"track_index": track_index, "loop_state_name": loop_state_name})
+            self.set_track_volume({"index": track_index, "value": current_volume})
+        elif self.loopFadeStates[loop_state_name]['state'] == LOOP_FADE_STATE.FADING_OUT:
+            current_volume = current_volume - self.fadeSpeed * FADE_AMOUNT
+            if current_volume < 0:
+                current_volume = 0
+            if current_volume == 0:
+                self.loopFadeStates[loop_state_name]['state'] = LOOP_FADE_STATE.VOLUME_ALL_DOWN
+                self.schedule_message(1, self.stop_loops_on_track, track_index)
+            else:
+                self.schedule_message(1, self.fadeLoop, {"track_index": track_index, "loop_state_name": loop_state_name})
+            self.set_track_volume({"index": track_index, "value": current_volume})
+
     def stop_loop(self, note):
+        is_bank_a = note < Channel_1_Note.LOOP9
+        track_index = self.track_processor.loop_tracks[note]
+        loop_state_name = f'LOOP{note + 1}'
+        if is_bank_a == False:
+            #offset for bank b
+            track_index + track_index + 1
         if self.fadeLoops:
-            self.loopFadeStates[f'LOOP{note + 1}']['state'] = LOOP_FADE_STATE.FADING_OUT
-            if self.fade_timer.is_running() == False:
-                self.fade_timer.start()
+            self.loopFadeStates[loop_state_name]['state'] = LOOP_FADE_STATE.FADING_OUT
+            self.fadeLoop({"track_index": track_index, "loop_state_name": loop_state_name})
         else:
             self.stop_loops_on_track(self.track_processor.loop_tracks[note])
 
